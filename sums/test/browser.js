@@ -1264,7 +1264,7 @@ const fakeSpeech = () => {
   });
   ok(rq.length === 0, 'Rulers: length = end − start, Year 1 in blocks, Year 2 from 0, Year 3 sometimes not from 0 ' + rq.join(' | '));
   for (const yr of [4, 3, 1, 2]) await yearSheet('ruler', yr, 'Rulers');
-  ok(await page.evaluate(() => cards.every(c => { const t = [...c.el.querySelectorAll('svg text')].map(x => +x.textContent); return t.length === 11 && t[0] === 0 && t[10] === 10 && c.el.querySelector('.u').textContent === 'cm'; })), 'Rulers Year 2: a 0–10 cm ruler and "cm" after the line');
+  ok(await page.evaluate(() => cards.filter(c => !c.q.dial && !c.q.jug).every(c => { const t = [...c.el.querySelectorAll('svg text')].map(x => +x.textContent); return t.length === 11 && t[0] === 0 && t[10] === 10 && c.el.querySelector('.u').textContent === 'cm'; })), 'Rulers Year 2: a 0–10 cm ruler and "cm" after the line');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/31-ruler-y2.png' });
   ok(await page.evaluate(() => [labelFor('graph~3|12'), labelFor('shape~2|flat,solid|6'), labelFor('ruler~1|6')].join(' / '))
     === 'Graphs · Year 3 · 12 questions / Shapes · Year 2 · flat, 3D · 6 questions / Rulers · Year 1 · 6 questions', 'record labels for Graphs, Shapes, Rulers');
@@ -2259,6 +2259,46 @@ const fakeSpeech = () => {
   }
   ok(await page.evaluate(() => [ACTS.money.key({ yr: 2, kinds: ['count', 'make'], n: 6 }), ACTS.money.key({ yr: 1, kinds: ['count', 'make'], n: 6 }), labelFor('money~2|make|6'), labelFor('parts~2|tap,write|6')].join(' / '))
     === 'money~2|count,make|6 / money~1|count|6 / Money · Year 2 · make it · 6 questions / Halves and quarters · Year 2 · which one, half of a number · 6 questions', 'D2b record keys and labels');
+
+  // ---- D2c: Rulers Year 2, Scales (a dial in grams) and Jug (mL)
+  const sj = await page.evaluate(() => {
+    const bad = [], seen = { pencil: 0, dial: 0, jug: 0 }, steps = new Set();
+    const dom = h => new DOMParser().parseFromString(`<div>${h}</div>`, 'text/html');
+    for (let i = 0; i < 900; i++) {
+      const q = rulerQ(2, ['pencil', 'scales', 'jug']);
+      seen[q.dial ? 'dial' : q.jug ? 'jug' : 'pencil']++;
+      if (!q.dial && !q.jug) continue;
+      steps.add(q.step);
+      if (q.kind !== 'ruler' || q.ans !== q.v || q.v % q.step || q.v < q.step || q.v > 9 * q.step || !MEASURE_STEPS.includes(q.step) || cardSay(q) !== q.say) bad.push('q ' + JSON.stringify(q));
+      const d = dom(rulerSvg(q)), t = [...d.querySelectorAll('text')].map(x => x.textContent);
+      if (q.dial) {
+        if (q.unit !== 'g' || q.cap !== 'How heavy?' || q.say !== 'How heavy is it, in grams?') bad.push('dial words ' + q.cap);
+        if (t.join() !== [...range(0, 10).map(j => j * q.step), 'g'].join()) bad.push('dial numbers ' + t);
+        const p = d.querySelector(`line[stroke="${BLOCK.red}"]`), a = (Math.atan2(+p.getAttribute('x2'), -p.getAttribute('y2')) * 180 / Math.PI + 360) % 360;
+        if (Math.abs(a - q.v / (10 * q.step) * 300) > 0.5) bad.push(`pointer ${a} for ${q.v}/${q.step}`);
+      } else {
+        if (q.unit !== 'mL' || q.cap !== 'How much?' || !/millilitres/.test(q.say)) bad.push('jug words ' + q.cap);
+        if (t.join() !== range(1, 10).map(j => j * q.step).join()) bad.push('jug numbers ' + t);
+        const lab = [...d.querySelectorAll('text')].find(x => +x.textContent === q.v), w = d.querySelector(`line[stroke="${BLOCK.blue}"]`);
+        if (!lab || +lab.getAttribute('y') !== +w.getAttribute('y1')) bad.push('water not on the mark for ' + q.v);
+      }
+    }
+    if (Math.min(...Object.values(seen)) < 230 || steps.size !== 3) bad.push('mix ' + JSON.stringify(seen) + [...steps]);
+    for (const yr of [1, 3, 4]) if (range(0, 60).some(() => { const q = rulerQ(yr, ['scales', 'jug']); return q.dial || q.jug; })) bad.push('scales or jug in Year ' + yr);
+    if (!range(0, 60).every(() => rulerQ(2, ['scales']).dial && rulerQ(2, ['jug']).jug)) bad.push('one kind alone');
+    if (range(0, 200).some(() => rulerQ(4, ['pencil', 'scales', 'jug', 'thermo']).dial) || range(0, 400).filter(() => rulerQ(4, ['pencil', 'scales', 'jug', 'thermo']).thermo).length < 140) bad.push('Year 4 thermometer share changed');
+    return bad.slice(0, 4);
+  });
+  ok(sj.length === 0, 'Rulers Year 2: Scales (0 at the top, pointer on a numbered mark) and Jug (water level on a numbered mark), steps of 2, 5, 10, a third each with Pencil, Year 2 only ' + sj.join(' | '));
+  for (const n of [6, 12]) {
+    await page.evaluate(n => { setYear(2); hideDone(); act = 'ruler'; buildSheet({ yr: 2, kinds: ['pencil', 'scales', 'jug'], n }); show('sheet'); [scalesQ(), jugQ(), scalesQ(), jugQ()].forEach((q, i) => { cards[i].q = q; layout(cards[i]); sizeCanvas(cards[i]); }); }, n);
+    ok((await fits()).length === 0, `Rulers Year 2 Scales and Jug (${n}) fit with room to write ` + (await fits()).join(' '));
+    ok(await page.evaluate(() => cards.filter(c => c.q.jug).every(c => c.el.querySelector('.side .u').textContent === 'mL') && cards.filter(c => c.q.dial).every(c => c.el.querySelector('.side .u').textContent === 'g')), `Rulers Year 2 (${n}): the answer beside the jug in mL and beside the scales in g`);
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/31-scales-jug-${n}.png` });
+    ok((await writeAllAndMark()).length === 0 && await page.evaluate(n => sheetDone && loadRec(current).history[0].k === `ruler~2|pencil,scales,jug|${n}`, n), `Rulers Year 2 Scales and Jug (${n}): read and marked right, record ruler~2|pencil,scales,jug|${n}`);
+  }
+  ok(await page.evaluate(() => [ACTS.ruler.key({ yr: 2, kinds: ['pencil'], n: 6 }), ACTS.ruler.key({ yr: 2, kinds: ['scales', 'jug', 'thermo'], n: 12 }), ACTS.ruler.key({ yr: 3, kinds: ['pencil', 'scales'], n: 12 }), ACTS.ruler.key({ yr: 4, kinds: ['pencil', 'jug', 'thermo'], n: 12 }), ACTS.ruler.defaults(8).kinds.join(), labelFor('ruler~2|pencil,scales,jug|6'), labelFor('ruler~2|6')].join(' / '))
+    === 'ruler~2|6 / ruler~2|scales,jug|12 / ruler~3|12 / ruler~4|pencil,thermo|12 / pencil,scales,jug,thermo / Rulers · Year 2 · pencil, scales, jug · 6 questions / Rulers · Year 2 · 6 questions', 'D2c record keys and labels (Pencil alone keeps the old Year 2 key)');
   await page.evaluate(() => { setYear(4); hideDone(); });
 
   // ---- B4: Splat, Halves and quarters, Money Which coin?, Rulers Which is longer? (Year 1)
@@ -2403,7 +2443,7 @@ const fakeSpeech = () => {
   await page.evaluate(() => { age = 8; hideDone(); });
   ok(await page.evaluate(() => [ACTS.money.key({ yr: 1, kinds: ['count', 'coin'], n: 6 }), ACTS.money.key({ yr: 3, kinds: ['count', 'coin'], n: 6 }), ACTS.money.defaults(5).kinds.filter(k => k !== 'make').join(), ACTS.ruler.key({ yr: 1, kinds: ['pencil'], n: 6 }), ACTS.ruler.key({ yr: 1, kinds: ['pencil', 'longer'], n: 6 }), ACTS.ruler.key({ yr: 1, kinds: ['longer'], n: 6 }), ACTS.ruler.key({ yr: 2, kinds: ['pencil', 'longer'], n: 6 }), ACTS.ruler.defaults(5).kinds.join(),
       labelFor('money~1|count,coin|6'), labelFor('ruler~1|6'), labelFor('ruler~1|longer|6'), labelFor('ruler~1|pencil,longer|6'), labelFor('splat~1|6'), labelFor('parts~1|tap,write|6')].join(' / '))
-    === 'money~1|count,coin|6 / money~3|count|6 / count,coin / ruler~1|6 / ruler~1|pencil,longer|6 / ruler~1|longer|6 / ruler~2|6 / pencil,longer / Money · Year 1 · how much, which coin · 6 questions / Rulers · Year 1 · 6 questions / Rulers · Year 1 · which is longer · 6 questions / Rulers · Year 1 · pencil, which is longer · 6 questions / Splat · Year 1 · 6 questions / Halves and quarters · Year 1 · which one, half of a number · 6 questions',
+    === 'money~1|count,coin|6 / money~3|count|6 / count,coin / ruler~1|6 / ruler~1|pencil,longer|6 / ruler~1|longer|6 / ruler~2|6 / pencil,longer,scales,jug / Money · Year 1 · how much, which coin · 6 questions / Rulers · Year 1 · 6 questions / Rulers · Year 1 · which is longer · 6 questions / Rulers · Year 1 · pencil, which is longer · 6 questions / Splat · Year 1 · 6 questions / Halves and quarters · Year 1 · which one, half of a number · 6 questions',
     'B4 record keys: Which coin? only in Year 1 keys, Which is longer? only in Year 1; old Year 1 pencil keys unchanged; labels');
 
   // ---- how many questions (Sam: 20 is too many almost everywhere)
@@ -3169,7 +3209,7 @@ const fakeSpeech = () => {
     for (const [a, c] of [['tf', { yr: 4, n: 12 }], ['cmp', { yr: 4, kinds: ['num', 'sum'], n: 12 }], ['pv', { kinds: ['blocks'], max: 9999, n: 12 }], ['money', { yr: 4, kinds: ['change'], n: 12 }],
       ['graph', { yr: 4, n: 12 }], ['nline', { steps: [25, 50, 1000], n: 12 }], ['muldiv', { yr: 4, ops: ['/'], n: 12 }], ['dec', { yr: 4, kinds: ['pic', 'line', 'addsub', 'ten'], n: 12 }],
       ['frac', { kinds: ['past', 'add'], parts: [2, 3, 4, 5, 6, 8, 10, 12], n: 12 }], ['cmp', { yr: 4, kinds: ['frac'], n: 12 }], ['fof', { yr: 4, kinds: ['part', 'whole'], n: 12 }],
-      ['area', { kinds: ['odd', 'cubes'], max: 12, n: 12 }], ['ruler', { yr: 4, kinds: ['pencil', 'thermo'], n: 12 }],
+      ['area', { kinds: ['odd', 'cubes'], max: 12, n: 12 }], ['ruler', { yr: 4, kinds: ['pencil', 'thermo'], n: 12 }], ['ruler', { yr: 2, kinds: ['scales'], n: 12 }], ['ruler', { yr: 2, kinds: ['jug'], n: 12 }],
       ['units', { yr: 4, n: 12 }], ['angle', { yr: 4, kinds: ['size'], n: 12 }], ['angle', { yr: 4, kinds: ['deg'], n: 12 }],
       ['map', { yr: 4, kinds: ['tap'], n: 6 }], ['map', { yr: 4, kinds: ['where'], n: 6 }], ['shape', { yr: 4, kinds: ['moves'], n: 12 }], ['money', { yr: 4, kinds: ['make'], n: 12 }],
       ['muldiv', { yr: 1, ops: ['*', '/'], n: 12 }], ['graph', { yr: 1, n: 12 }], ['howmany', { kinds: ['groups'], max: 10, n: 12 }],

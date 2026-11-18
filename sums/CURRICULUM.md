@@ -114,7 +114,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 ### Measurement
 - Measure length, weight or capacity with an informal unit used again and again (paper clips). ✋ ✓ partly (Rulers, Year 1: blocks)
 - Compare and order several objects by those units.
-- Estimate and measure in cm, g and mL with a marked tool (ruler, scale, jug). ✓ partly (Rulers, Year 2: cm only)
+- Estimate and measure in cm, g and mL with a marked tool (ruler, scale, jug). ✓ (Rulers, Year 2: a cm ruler from 0, Scales: a round dial in grams, Jug: a measuring jug in mL, every mark numbered in 2s, 5s or 10s; reading only, not estimating; D2c)
 - Perimeter of a polygon in metric units. ✓ (Area: Perimeter)
 - Full, half, quarter and three-quarter turns, clockwise and anticlockwise.
 - Months and seasons in order; the month before and after; ordinals for months.

@@ -1740,8 +1740,13 @@ function shapeSvg(q) {
 
 // Rulers: Year 1 counts blocks under a pencil, Year 2 a cm ruler from 0,
 // Year 3 a pencil that may not start at 0 (half-cm marks too)
+const RULER_KINDS = { 1: ['pencil', 'longer'], 2: ['pencil', 'scales', 'jug'], 3: ['pencil'], 4: ['pencil', 'thermo'] };
 function rulerQ(yr, kinds = ['pencil']) {
-  if (yr === 4 && pickOne(kinds) === 'thermo') return thermoQ();
+  // a Kind that doesn't fit the year is ignored: each year picks among its own kinds that are on
+  const own = kinds.filter(k => (RULER_KINDS[yr] || ['pencil']).includes(k)), k = pickOne(own.length ? own : ['pencil']);
+  if (yr === 4 && k === 'thermo') return thermoQ();
+  if (yr === 2 && k === 'scales') return scalesQ();
+  if (yr === 2 && k === 'jug') return jugQ();
   // Which is longer? is a Year 1 tap card (pencils, then towers); half the cards when Pencil is on too
   if (yr === 1 && kinds.includes('longer') && (!kinds.includes('pencil') || Math.random() < 0.5)) return longerQ();
   const col = pickOne(['red', 'blue', 'green', 'yellow', 'purple']);
@@ -1773,8 +1778,50 @@ function thermoSvg(q) {
   }
   return `<svg ${emBox([-9, -6, 35, 84], 0.062)}>${s}</svg>`;
 }
+// Scales and Jug (Rulers, Year 2, D2c): ten steps of 2, 5 or 10, every mark
+// numbered; the pointer or the water is always on a numbered mark, never 0 or the top
+const MEASURE_STEPS = [2, 5, 10];
+function scalesQ() {
+  const step = pickOne(MEASURE_STEPS), v = step * rnd(1, 9);
+  return { kind: 'ruler', yr: 2, dial: true, step, v, cap: 'How heavy?', unit: 'g', say: 'How heavy is it, in grams?', ans: v };
+}
+function jugQ() {
+  const step = pickOne(MEASURE_STEPS), v = step * rnd(1, 9);
+  return { kind: 'ruler', yr: 2, jug: true, step, v, cap: 'How much?', unit: 'mL', say: 'How much water is in the jug, in millilitres?', ans: v };
+}
+// a round dial: 0 at the top, clockwise round 300°, a red pointer; a parcel on the pan
+function scalesSvg(q) {
+  const R = 37, max = q.step * 10, at = (v, r) => { const a = v / max * 300 * Math.PI / 180; return [r * Math.sin(a), -r * Math.cos(a)].map(z => +z.toFixed(2)); };
+  let s = `<rect x="-26" y="-58" width="52" height="5" rx="2" fill="#fff" stroke="${INK}" stroke-width=".8"/><rect x="-3" y="-53" width="6" height="7" fill="#fff" stroke="${INK}" stroke-width=".8"/>`
+    + `<rect x="-14" y="-72" width="28" height="14" rx="1.5" fill="#f3dcb0" stroke="${INK}" stroke-width=".8"/><line x1="0" y1="-72" x2="0" y2="-58" stroke="${INK}" stroke-width=".6"/>`
+    + `<rect x="-46" y="-46" width="92" height="92" rx="12" fill="#e6e6e6" stroke="${INK}" stroke-width=".9"/><circle r="${R + 4}" fill="#fff" stroke="${INK}" stroke-width=".8"/>`;
+  let nums = ''; // the numbers sit over the pointer with a white edge, so it never hides one
+  for (let i = 0; i <= 10; i++) {
+    const v = i * q.step, [x1, y1] = at(v, R + 2), [x2, y2] = at(v, R - 4), [tx, ty] = at(v, R - 12);
+    s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${INK}" stroke-width=".9"/>`;
+    nums += svgText(tx, ty, v, 8).replace('<text ', '<text stroke="#fff" stroke-width="2.4" paint-order="stroke" ');
+  }
+  const [px, py] = at(q.v, R - 1); // "g" goes above the middle: the pointer is never between 0 and the top number
+  s += `<line x1="0" y1="0" x2="${px}" y2="${py}" stroke="${BLOCK.red}" stroke-width="2" stroke-linecap="round"/><circle r="3" fill="${INK}"/>` + nums + svgText(0, -13, 'g', 8);
+  return `<svg ${emBox([-48, -74, 96, 122], 0.05)}>${s}</svg>`;
+}
+// a measuring jug: straight sides, a spout and a handle, a mark and a number at
+// every step, flat blue water up to a mark
+function jugSvg(q) {
+  const k = 8, H = 10 * k, y = v => H - v / q.step * k, top = -10, wl = y(q.v);
+  let s = `<path d="M24 ${top + 6}H30A8 8 0 0 1 38 ${top + 14}V${H - 22}A8 8 0 0 1 30 ${H - 14}H24" fill="none" stroke="${INK}" stroke-width="3.2"/>`
+    + `<rect x="-24" y="${wl}" width="48" height="${H - wl}" fill="${tint(BLOCK.blue, 0.55)}"/><line x1="-24" y1="${wl}" x2="24" y2="${wl}" stroke="${BLOCK.blue}" stroke-width="1.2"/>`
+    + `<path d="M-30 ${top - 4}L-24 ${top + 4}V${H}H24V${top}H-24" fill="none" stroke="${INK}" stroke-width="1" stroke-linejoin="round"/>`;
+  for (let i = 1; i <= 10; i++) {
+    const v = i * q.step;
+    s += `<line x1="-24" y1="${y(v)}" x2="-16" y2="${y(v)}" stroke="${INK}" stroke-width=".8"/>` + svgText(-13.5, y(v), v, 7.5, 'start');
+  }
+  return `<svg ${emBox([-32, top - 6, 74, H - top + 8], 0.06)}>${s}</svg>`;
+}
 function rulerSvg(q) {
   if (q.thermo) return thermoSvg(q);
+  if (q.dial) return scalesSvg(q);
+  if (q.jug) return jugSvg(q);
   if (q.yr === 4) { // in mm: 1.6 units a mm, marks every mm, longer every 5 mm, numbers every cm
     const um = 1.6, x0 = q.s * um, x1 = q.e * um, N = 60;
     let s = `<rect x="${x0}" y="0" width="${x1 - x0 - 7}" height="9" fill="${BLOCK[q.col]}" stroke="${INK}" stroke-width=".8"/>`
@@ -3749,14 +3796,15 @@ const ACTS = {
     name: 'Rulers', ages: [5, 8], setup: 'opts', say: 'How long is the pencil?',
     pic: rulerSvg({ yr: 2, s: 0, e: 9, col: 'red' }),
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · blocks'], [2, '2 · cm from 0'], [3, '3 · cm, not from 0'], [4, '4 · millimetres, °C']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['pencil', 'Pencil'], ['longer', 'Which is longer? (Year 1)'], ['thermo', 'Thermometer (Year 4)']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · blocks'], [2, '2 · cm, grams, mL'], [3, '3 · cm, not from 0'], [4, '4 · millimetres, °C']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['pencil', 'Pencil'], ['longer', 'Which is longer? (Year 1)'], ['scales', 'Scales (Year 2)'], ['jug', 'Jug (Year 2)'], ['thermo', 'Thermometer (Year 4)']] },
     ],
-    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: age === 5 ? ['pencil', 'longer'] : ['pencil', 'thermo'], n: age === 5 ? 6 : 12 }),
+    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: age === 5 ? ['pencil', 'longer', 'scales', 'jug'] : ['pencil', 'scales', 'jug', 'thermo'], n: age === 5 ? 6 : 12 }),
     make: c => rulerQ(c.yr, c.kinds),
-    // the Kind only changes Years 1 and 4; Year 1 with Pencil alone keeps its old record key, Years 2 and 3 never had a Kind
+    // the Kind only changes Years 1, 2 and 4; Pencil alone keeps the old record key (Year 3 never had a Kind)
     key: c => {
       if (c.yr === 4) return `ruler~4|${['pencil', 'thermo'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`;
+      if (c.yr === 2) { const k2 = RULER_KINDS[2].filter(k => c.kinds.includes(k)); return k2.length && k2.join() !== 'pencil' ? `ruler~2|${k2.join(',')}|${c.n}` : `ruler~2|${c.n}`; }
       const k1 = c.yr === 1 ? ['pencil', 'longer'].filter(k => c.kinds.includes(k)) : ['pencil'];
       return k1.join() === 'pencil' || !k1.length ? `ruler~${c.yr}|${c.n}` : `ruler~1|${k1.join(',')}|${c.n}`;
     },
@@ -4433,8 +4481,8 @@ function qMarkup(q) {
     const [, pw, ph] = pic.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
     const capLen = q.capLen || q.cap.length, capLines = q.cap.split('<br>').length; // a long question takes two lines
     const ans = `<div class="ans"><span class="ln w"></span>${q.unit ? `<span class="u">${q.unit}</span>` : ''}</div>`;
-    // the upright thermometer is tall and thin: the answer goes beside it, so the picture can be bigger
-    if (q.thermo) return { cls: 'pic2', anchor: '.ln', html: `<div class="cap">${q.cap}</div><div class="side">${pic}${ans}</div>`, vars: { '--h': ph + 1.1 + 0.4, '--c': pw + 0.7 + 3.6 + 1.2 } };
+    // the upright thermometer and the jug are tall and thin, the scales' dial tall too: the answer goes beside, so the picture can be bigger
+    if (q.thermo || q.jug || q.dial) return { cls: 'pic2', anchor: '.ln', html: `<div class="cap">${q.cap}</div><div class="side">${pic}${ans}</div>`, vars: { '--h': ph + 1.1 + 0.4, '--c': pw + 0.7 + 3.6 + 1.2 } };
     return {
       cls: 'pic2', anchor: '.ln',
       html: `<div class="cap">${q.cap}</div>${pic}<div class="ans"><span class="ln w"></span>${q.unit ? `<span class="u">${q.unit}</span>` : ''}</div>`,
