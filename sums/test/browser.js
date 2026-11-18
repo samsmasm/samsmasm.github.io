@@ -106,7 +106,7 @@ const fakeSpeech = () => {
   await page.click('#yPrev');
   const y3 = await tiles('#actTiles');
   ok(await page.evaluate(() => view === 3 && $('#yView').textContent === 'Year 3' && $('#yMine').textContent === ''), '‹ goes to the Year 3 page');
-  ok(y3.length === 25 && ['Rounding', 'Splat', 'Number bonds', 'True or false', 'More or less', 'Balance'].every(t => y3.includes(t)) && y3.includes('Arrays') && y3.includes('Clocks'), 'Year 3 page: year activities at Year 3 plus the older tiles ' + y3.join());
+  ok(y3.length === 26 && ['Rounding', 'Splat', 'Number bonds', 'Fractions of a number','True or false', 'More or less', 'Balance'].every(t => y3.includes(t)) && y3.includes('Arrays') && y3.includes('Clocks'), 'Year 3 page: year activities at Year 3 plus the older tiles ' + y3.join());
   await page.click('#actTiles [data-act="clock"]');
   ok(await page.evaluate(() => draft.yr === 3 && $('.sughint').textContent === 'From the page for: Year 3'), 'Clocks from the Year 3 page opens at Year 3');
   await page.click('#backBtn');
@@ -2895,12 +2895,12 @@ const fakeSpeech = () => {
     if (trues < 320 || trues > 480) bad.push('tf true ' + trues);
     if (cmps < 320 || cmps > 480) bad.push('tf compare ' + cmps);
     for (let i = 0; i < 600; i++) { // More or less
-      const kinds = pickOne([['num'], ['sum'], ['num', 'sum'], ['dots', 'frac']]), q = cmpQ(3, kinds), lv = val(q.l), rv = val(q.r), want = lv < rv ? 0 : lv === rv ? 1 : 2;
+      const kinds = pickOne([['num'], ['sum'], ['num', 'sum'], ['dots', 'dec']]), q = cmpQ(3, kinds), lv = val(q.l), rv = val(q.r), want = lv < rv ? 0 : lv === rv ? 1 : 2;
       if (q.yr !== 3 || q.right !== want || q.ans !== q.tiles[want].label || q.tiles.map(t => t.label).join('') !== '<=>' || q.say !== `${signWords(q.l)}, and ${signWords(q.r)}. Which sign goes in the box?`) bad.push('cmp ' + JSON.stringify(q));
       if ([...q.l.match(/\d+/g), ...q.r.match(/\d+/g)].some(n => +n < 1 || +n > 1000) || !Number.isInteger(lv) || !Number.isInteger(rv)) bad.push('cmp size ' + q.l + ' ' + q.r);
       const isNum = /^\d+$/.test(q.l) && /^\d+$/.test(q.r);
       if (kinds.includes('sum') !== !isNum && kinds.join() !== 'num,sum') bad.push('cmp kind ' + kinds + ' ' + q.l);
-      if (kinds.join() === 'dots,frac' && !isNum) bad.push('cmp kinds a year lacks ' + q.l);
+      if (kinds.join() === 'dots,dec' && !isNum) bad.push('cmp kinds a year lacks ' + q.l);
       if (!isNum && q.l === q.r) bad.push('cmp same sum ' + q.l);
       if (!isNum && /[×÷]/.test(q.l)) seen.add('cmp facts'); else if (!isNum) seen.add('cmp hundreds');
       same += lv === rv;
@@ -2931,7 +2931,7 @@ const fakeSpeech = () => {
   ok(e1.length === 0, 'Year 3: True or false (< > to 1,000, + − × ÷ with the 2, 3, 4, 5, 8, 10 tables), More or less (to 1,000, table facts, hundreds and tens), Balance (to 1,000, all four signs), Rounding (nearest 10 or 100) ' + e1.join(' | '));
   ok(await page.evaluate(() => [ACTS.cmp.key({ yr: 3, kinds: ['dots', 'num', 'sum', 'dec', 'frac'], n: 12 }), ACTS.cmp.key({ yr: 3, kinds: ['frac'], n: 6 }), ACTS.round.key({ yr: 3, kinds: ['line', 'num'], n: 12 }),
     labelFor('cmp~3|num,sum|12'), labelFor('tf~3|12'), labelFor('bal~3|6'), labelFor('round~3|line|6'), ['tf', 'cmp', 'bal', 'round'].map(a => yearsOf(a).join('')).join(' ')].join(' / '))
-    === 'cmp~3|num,sum|12 / cmp~3|num|6 / round~3|line,num|12 / More or less · Year 3 · numbers, sums · 12 questions / True or false · Year 3 · 12 questions / Balance · Year 3 · 6 questions / Rounding · Year 3 · number line · 6 questions / 12345 12345 12345 2345','Year 3 record keys and labels; the Year rows');
+    === 'cmp~3|num,sum,frac|12 / cmp~3|frac|6 / round~3|line,num|12 / More or less · Year 3 · numbers, sums · 12 questions / True or false · Year 3 · 12 questions / Balance · Year 3 · 6 questions / Rounding · Year 3 · number line · 6 questions / 12345 12345 12345 2345','Year 3 record keys and labels; the Year rows');
   await page.evaluate(() => { setYear(3); hideDone(); });
   for (const [a, c] of [['tf', { yr: 3, n: 12 }], ['cmp', { yr: 3, kinds: ['num', 'sum'], n: 12 }], ['bal', { yr: 3, n: 12 }], ['round', { yr: 3, kinds: ['line', 'num'], n: 12 }], ['tf', { yr: 3, n: 6 }], ['round', { yr: 3, kinds: ['line'], n: 6 }]]) {
     await page.evaluate((a, c) => { hideDone(); act = a; buildSheet(c); show('sheet'); }, a, c);
@@ -3003,6 +3003,50 @@ const fakeSpeech = () => {
   ok((await fits()).length === 0, 'Add and take away Year 3 with 700 + 200 across fits ' + (await fits()).join(' '));
   if (SHOTS) await page.screenshot({ path: SHOTS + '/48-addsub-y3-hund.png' });
   ok((await writeAllAndMark()).length === 0, 'Add and take away Year 3: 700 + 200 across read and marked right');
+
+  // ---- E1c: More or less Fractions Year 3, Fractions Add within 1, Fractions of a number Year 3
+  const e1c = await page.evaluate(() => {
+    const bad = [], seen = new Set();
+    let fr = 0;
+    for (let i = 0; i < 600; i++) { // More or less Year 3, fractions
+      const q = cmpQ(3, ['num', 'sum', 'frac']);
+      if (q.type !== 'frac') continue;
+      fr++;
+      const [a, b] = q.l.split('/').map(Number), [c, d] = q.r.split('/').map(Number), want = a * d < c * b ? 0 : a * d === c * b ? 1 : 2;
+      if (q.yr !== 3 || q.right !== want || want === 1 || q.ans !== q.tiles[want].label || q.tiles.map(t => t.label).join('') !== '<=>' || b > 12 || d > 12 || a >= b || c >= d || q.say !== `${a} over ${b}, and ${c} over ${d}. Which sign goes in the box?`) bad.push('cmp frac ' + JSON.stringify(q));
+      if (a === 1 && c === 1 && b !== d) seen.add('unit'); else if (b === d && a !== c) seen.add('same bottom'); else bad.push('cmp frac type ' + q.l + ' ' + q.r);
+      const dom = new DOMParser().parseFromString(`<div>${q.top}</div>`, 'text/html');
+      const bars = [...dom.querySelectorAll('svg')].map(s => [...s.querySelectorAll('rect')].filter(r => r.getAttribute('fill') !== 'none'));
+      if (bars.length !== 2 || bars[0].length !== b || bars[1].length !== d || bars[0].filter(r => r.getAttribute('fill') !== 'white').length !== a || bars[1].filter(r => r.getAttribute('fill') !== 'white').length !== c) bad.push('cmp frac bars ' + q.l + ' ' + q.r);
+    }
+    if (fr < 140 || fr > 270) bad.push('cmp frac share ' + fr + ' of 600');
+    if (range(0, 100).some(() => cmpQ(3, ['frac']).type !== 'frac')) bad.push('cmp frac only');
+    let three = 0, minus = 0;
+    for (let i = 0; i < 600; i++) { // Fractions, Add within 1
+      const q = fracQ({ kinds: ['add1'], parts: pickOne([[2, 3, 4, 6, 8], [2], [12], [3, 5, 10]]) });
+      const n = q.op === '+' ? q.terms.reduce((x, y) => x + y) : q.terms[0] - q.terms[1];
+      if (q.kind !== 'frac' || q.form !== 'add' || !q.within || q.n !== n || n < 1 || n >= q.d || q.terms.some(t => t < 1 || t >= q.d) || q.ans !== `${n}/${q.d}` || q.d < 3) bad.push('add1 ' + JSON.stringify(q));
+      three += q.terms.length === 3; minus += q.op === '−';
+    }
+    if (three < 60 || minus < 120 || minus > 280) bad.push('add1 three ' + three + ', minus ' + minus);
+    for (let i = 0; i < 600; i++) { // Fractions of a number Year 3: small tables only
+      const q = fofQ(3, pickOne([['part'], ['whole'], ['part', 'whole', 'pct']]));
+      if (q.kind !== 'fof' || q.pct || q.n > 1 || ![2, 3, 4, 5, 8, 10].includes(q.d) || q.k < 2 || q.k > 10 || q.whole !== q.k * q.d || q.ans !== (q.part ? q.k : q.whole)) bad.push('fof3 ' + JSON.stringify(q));
+      seen.add('fof ' + (q.part ? 'part' : 'whole'));
+    }
+    ['unit', 'same bottom', 'fof part', 'fof whole'].forEach(w => { if (!seen.has(w)) bad.push('never saw ' + w); });
+    return bad.slice(0, 5);
+  });
+  ok(e1c.length === 0, 'Year 3 fractions: More or less unit fractions to twelfths and same bottom number over bars, never equal; Fractions Add within 1; Fractions of a number with the 2, 3, 4, 5, 8, 10 tables ' + e1c.join(' | '));
+  ok(await page.evaluate(() => { const y0 = year, out = []; year = 3; out.push(ACTS.frac.defaults(8).kinds.join()); year = 4; out.push(ACTS.frac.defaults(8).kinds.join()); year = y0;
+    return [...out, ACTS.frac.key({ kinds: ['add1', 'shapes'], parts: [4, 8], n: 6 }), labelFor('frac~shapes,line,add1|2,3,4,6,8|12'), ACTS.fof.key({ yr: 3, kinds: ['part', 'whole', 'pct'], n: 12 }), labelFor('fof~3|part,whole|6'), yearsOf('fof').join(''), ACTS.cmp.key({ yr: 3, kinds: ['frac'], n: 6 })].join(' / '); })
+    === 'shapes,line,add1 / shapes,line,past,add / frac~shapes,add1|4,8|6 / Fractions · shapes, line, + − within 1 · 2, 3, 4, 6, 8 parts · 12 questions / fof~3|part,whole|12 / Fractions of a number · Year 3 · part, whole · 6 questions / 345 / cmp~3|frac|6', 'E1c keys, labels, Year 3 Fractions default, Fractions of a number Years 3 to 5');
+  for (const [a, c] of [['cmp', { yr: 3, kinds: ['frac'], n: 12 }], ['cmp', { yr: 3, kinds: ['frac'], n: 6 }], ['frac', { kinds: ['add1'], parts: [2, 3, 4, 6, 8, 10, 12], n: 12 }], ['frac', { kinds: ['shapes', 'line', 'add1'], parts: [2, 3, 4, 6, 8], n: 6 }], ['fof', { yr: 3, kinds: ['part', 'whole'], n: 12 }], ['fof', { yr: 3, kinds: ['part', 'whole'], n: 6 }]]) {
+    await page.evaluate((a, c) => { hideDone(); act = a; buildSheet(c); show('sheet'); }, a, c);
+    ok((await fits()).length === 0, `${a} Year 3 E1c (${c.n}) fits ` + (await fits()).join(' '));
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/49-${a}-${c.kinds.join('')}-y3-${c.n}.png` });
+    ok((await writeAllAndMark()).length === 0, `${a} Year 3 E1c (${c.n}): read and marked right`);
+  }
 
   // ---- Money, Make it (Year 4): drop coins and notes in a tray. A7
   const mkq = await page.evaluate(() => {
@@ -3434,7 +3478,8 @@ const fakeSpeech = () => {
       ['shape', { yr: 5, kinds: ['nets'], n: 12 }], ['shape', { yr: 5, kinds: ['flat'], n: 12 }], ['shape', { yr: 5, kinds: ['solid'], n: 12 }],
       ['turn', { yr: 2, n: 12 }], ['map', { yr: 2, kinds: ['tap'], n: 6 }],
       ['tf', { yr: 3, n: 12 }], ['cmp', { yr: 3, kinds: ['num', 'sum'], n: 12 }], ['bal', { yr: 3, n: 12 }], ['round', { yr: 3, kinds: ['line', 'num'], n: 12 }],
-      ['splat', { yr: 3, n: 12 }], ['bonds', { max: 100, n: 12 }], ['addsub', { yr: 3, ops: ['+', '-'], n: 12 }]]) {
+      ['splat', { yr: 3, n: 12 }], ['bonds', { max: 100, n: 12 }], ['addsub', { yr: 3, ops: ['+', '-'], n: 12 }],
+      ['cmp', { yr: 3, kinds: ['frac'], n: 12 }], ['frac', { kinds: ['add1'], parts: [2, 3, 4, 6, 8, 10, 12], n: 12 }], ['fof', { yr: 3, kinds: ['part', 'whole'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

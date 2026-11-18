@@ -159,12 +159,12 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 ### Fractions and money
 - Read, write and show fractions of sets, amounts, shapes and on a number line, small denominators. ✓ (Fractions)
 - Count in unit fractions up to 1 (⅕, ⅖, ⅗...).
-- Compare unit fractions with denominators to 12 (bigger denominator = smaller piece: 1⁄12 < ⅙).
-- Compare fractions with the same denominator (⅜ < ⅝).
+- Compare unit fractions with denominators to 12 (bigger denominator = smaller piece: 1⁄12 < ⅙). ✓ (More or less, Year 3, Fractions kind: each fraction over a bar the same length; E1c)
+- Compare fractions with the same denominator (⅜ < ⅝). ✓ (More or less, Year 3, Fractions kind; E1c)
 - Spot equal fractions with pictures (³⁄₆ = ½; ²⁄₂ = ³⁄₃ = 1). ✓ (Fractions accepts them)
-- Add and subtract fractions with the same denominator within one (⅛ + ²⁄₈ + ³⁄₈ = ⁶⁄₈).
-- Unit fraction of a number by dividing (⅓ of 15 = 15 ÷ 3).
-- Whole from a unit fraction (¼ of a set is 3, so the set is 12).
+- Add and subtract fractions with the same denominator within one (⅛ + ²⁄₈ + ³⁄₈ = ⁶⁄₈). ✓ (Fractions, Add within 1 (Year 3) kind, the default for a Year 3 player; E1c)
+- Unit fraction of a number by dividing (⅓ of 15 = 15 ÷ 3). ✓ (Fractions of a number, Year 3: 2, 3, 4, 5, 8, 10 only, parts to 10; E1c)
+- Whole from a unit fraction (¼ of a set is 3, so the set is 12). ✓ (Fractions of a number, Year 3, Find the whole; E1c)
 - Write money as dollars and cents without a decimal point ($2 and 50 cents). ✓ (Money, Year 3)
 - Make amounts with $1 and $2 coins and $5, $10, $20, $50 and $100 notes. ✓ partly (Money: totals, not making)
 - Give change by adding and subtracting. ✓ (Money: Change)

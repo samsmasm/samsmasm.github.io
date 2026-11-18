@@ -892,6 +892,19 @@ const frHtml = (n, d) => `<span class="fr"><span>${n}</span><span>${d}</span></s
 function fracQ(c) {
   const d = pickOne(c.parts), kind = pickOne(c.kinds);
   if (kind === 'diff') return fracDiffQ(c.parts);
+  if (kind === 'add1') { // Year 3 (E1c): the same, but the answer stays below one whole (1/8 + 2/8 + 3/8)
+    const ds = c.parts.filter(x => x >= 3);
+    const d = pickOne(ds.length ? ds : [4, 8]);
+    let terms, op = '+', n;
+    if (Math.random() < 1 / 3) { const a = rnd(2, d - 1); terms = [a, rnd(1, a - 1)]; op = '−'; n = terms[0] - terms[1]; }
+    else { // pick the total first (below one whole), then cut it into two or three parts
+      const k = d >= 4 && Math.random() < 0.35 ? 3 : 2;
+      n = rnd(k, d - 1);
+      const cuts = shuffled(range(1, n - 1)).slice(0, k - 1).sort((x, y) => x - y);
+      terms = [...cuts, n].map((v, i, a) => v - (i ? a[i - 1] : 0));
+    }
+    return { kind: 'frac', form: 'add', within: true, terms, op, n, d, ans: `${n}/${d}`, say: terms.map(x => `${x} over ${d}`).join(op === '+' ? ' plus ' : ' take away ') };
+  }
   if (kind === 'add') {
     for (let t = 0; t < 100; t++) {
       let terms, op = '+', n;
@@ -2218,10 +2231,25 @@ function cmp2Q() {
 // facts from the 2, 3, 4, 5, 8, 10 tables (4 × 6 and 3 × 8, 24 ÷ 3 and 5 × 2), or
 // hundreds and tens (300 + 40 and 350 − 10). About one in five the same.
 const FACTS3 = TABLES3.flatMap(t => range(2, 10).flatMap(k => [[k, '×', t], [k * t, '÷', t]]));
+// Fractions, Year 3 (E1c): two unit fractions to twelfths (1/12 and 1/6) or the
+// same bottom number (3/8 and 5/8), each over a small bar the same length with its
+// parts shaded, so she can see which is bigger. Never equal.
+function cmpFrac3Q() {
+  let L, R;
+  if (Math.random() < 0.5) { const [b, d] = distinctPick(2, 2, 12); L = [1, b]; R = [1, d]; }
+  else { const b = pickOne([3, 4, 5, 6, 8, 10, 12]), [a, c] = distinctPick(2, 1, b - 1); L = [a, b]; R = [c, b]; }
+  const right = L[0] * R[1] < R[0] * L[1] ? 0 : 2;
+  const side = x => `<span class="tfc">${frHtml(...x)}${fracMini(x[0], x[1], 3)}</span>`;
+  return {
+    kind: 'tap', yr: 3, type: 'frac', l: `${L[0]}/${L[1]}`, r: `${R[0]}/${R[1]}`, top: `<span class="tfd">${side(L)}<span class="bx" style="margin-top:.6em"></span>${side(R)}</span>`,
+    tc: 7.6, th: 3.3, topf: 0.66, tiles: CMP_TILES, right, say: `${L[0]} over ${L[1]}, and ${R[0]} over ${R[1]}. Which sign goes in the box?`, ans: CMP_TILES[right].label,
+  };
+}
 function cmp3Q(kinds) {
-  kinds = kinds.filter(x => ['num', 'sum'].includes(x)); if (!kinds.length) kinds = ['num'];
+  kinds = kinds.filter(x => ['num', 'sum', 'frac'].includes(x)); if (!kinds.length) kinds = ['num'];
   for (let t = 0; t < 200; t++) {
     const kind = pickOne(kinds), same = Math.random() < 0.2;
+    if (kind === 'frac') return cmpFrac3Q();
     let l, r, lv, rv;
     if (kind === 'num') {
       [lv, rv] = same ? (n => [n, n])(rnd(100, 999)) : near1000(); l = String(lv); r = String(rv);
@@ -2648,8 +2676,9 @@ function fofQ(yr, kinds) {
       ? { kind: 'fof', part, n, d, whole, k, ans: n * k, say: `What is ${a} of ${whole}?` }
       : { kind: 'fof', part, n, d, whole, k, ans: whole, say: `${a} of a set is ${n * k}. How many in the set?` };
   }
-  const d = rnd(2, 10), k = fofK(d);
-  const whole = k * d, a = `${d === 8 ? 'an' : 'a'} ${DEN_WORD[d]}`;
+  // Year 3 (E1c): small tables only, so halves, thirds, quarters, fifths, eighths, tenths of up to 10 each
+  const d = yr === 3 ? pickOne(TABLES3) : rnd(2, 10), k = yr === 3 ? rnd(2, 10) : fofK(d);
+  const whole = k * d, a =`${d === 8 ? 'an' : 'a'} ${DEN_WORD[d]}`;
   return part
     ? { kind: 'fof', part, d, whole, k, ans: k, say: `What is ${a} of ${whole}?` }
     : { kind: 'fof', part, d, whole, k, ans: whole, say: `${a[0].toUpperCase() + a.slice(1)} of a set is ${k}. How many in the set?` };
@@ -3856,19 +3885,20 @@ const ACTS = {
     name: 'Fractions', ages: [8], setup: 'opts', say: 'What fraction is it?',
     pic: fracSvg({ shape: 'circle', n: 3, d: 4, shaded: [0, 1, 2] }),
     options: [
-      { key: 'kinds', label: 'Kind', multi: true, values: [['shapes', 'Shaded shapes'], ['line', 'Number line'], ['past', 'Past 1'], ['add', 'Add and take away'], ['diff', 'Add different (Year 5)']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['shapes', 'Shaded shapes'], ['line', 'Number line'], ['past', 'Past 1'], ['add1', 'Add within 1 (Year 3)'], ['add', 'Add and take away'], ['diff', 'Add different (Year 5)']] },
       { key: 'parts', label: 'Parts', multi: true, values: [2, 3, 4, 5, 6, 8, 10, 12] },
     ],
-    defaults: () => ({ kinds: ['shapes', 'line', 'past', 'add'], parts: [2, 3, 4, 6, 8], n: 12 }),
+    // no Year row: a player in Year 3 (or below) starts on Add within 1 instead of Past 1 and Add (E1c)
+    defaults: () => ({ kinds: year <= 3 ? ['shapes', 'line', 'add1'] : ['shapes', 'line', 'past', 'add'], parts: [2, 3, 4, 6, 8], n: 12 }),
     make: fracQ,
-    key: c => `frac~${['shapes', 'line', 'past', 'add', 'diff'].filter(k => c.kinds.includes(k)).join(',')}|${[...c.parts].sort((x, y) => x - y).join(',')}|${c.n}`,
-    label: k => { const [kinds, p, n] = k.split('|'); return `Fractions · ${kinds.split(',').map(x => ({ past: 'past 1', add: '+ −', diff: 'add different' })[x] || x).join(', ')} · ${p.split(',').join(', ')} parts · ${n} questions`; },
+    key: c => `frac~${['shapes', 'line', 'past', 'add1', 'add', 'diff'].filter(k => c.kinds.includes(k)).join(',')}|${[...c.parts].sort((x, y) => x - y).join(',')}|${c.n}`,
+    label: k => { const [kinds, p, n] = k.split('|'); return `Fractions · ${kinds.split(',').map(x => ({ past: 'past 1', add1: '+ − within 1', add: '+ −', diff: 'add different' })[x] || x).join(', ')} · ${p.split(',').join(', ')} parts · ${n} questions`; },
   },
   fof: {
     name: 'Fractions of a number', ages: [8], setup: 'opts', say: 'Work out the missing number.',
     pic: fofSvg({ d: 4, part: true, whole: 28, k: 7 }),
     options: [
-      { key: 'yr', label: 'Year', values: [[4, '4 · unit fractions'], [5, '5 · 2/3 of 24, percent']] },
+      { key: 'yr', label: 'Year', values: [[3, '3 · 1/3 of 15'], [4, '4 · 1/3 of 300'],[5, '5 · 2/3 of 24, percent']] },
       { key: 'kinds', label: 'Kind', multi: true, values: [['part', 'Find the part'], ['whole', 'Find the whole'], ['pct', 'Percent (Year 5)']] },
     ],
     defaults: () => ({ yr: 4, kinds: ['part', 'whole', 'pct'], n: 12 }),
@@ -4046,13 +4076,13 @@ const ACTS = {
     name: 'More or less', ages: [5, 8], setup: 'opts', say: 'More, less, or the same? Tap your answer.',
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="34" y="34" text-anchor="middle" font-size="24">47</text><rect x="50" y="14" width="22" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="3"/><text x="90" y="34" text-anchor="middle" font-size="24">74</text><text x="60" y="72" text-anchor="middle" font-size="24">&lt;  =  &gt;</text></svg>`,
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · dots, numbers to 20'], [2, '2 · numbers to 120, < = >'], [3, '3 · to 1,000, table facts'], [4, '4 · to 10,000, fractions'], [5, '5 · to 999,999, decimals']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['dots', 'Dots (Year 1)'], ['num', 'Numbers'], ['sum', 'Sums (Year 3 up)'], ['dec', 'Decimals (Year 5)'], ['frac', 'Fractions (Year 4 up)']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · dots, numbers to 20'], [2, '2 · numbers to 120, < = >'], [3, '3 · to 1,000, 1/6 and 1/12'], [4, '4 · to 10,000, fractions'], [5, '5 · to 999,999, decimals']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['dots', 'Dots (Year 1)'], ['num', 'Numbers'], ['sum', 'Sums (Year 3 up)'], ['dec', 'Decimals (Year 5)'], ['frac', 'Fractions (Year 3 up)']] },
     ],
     defaults: age => age === 5 ? { yr: 1, kinds: ['dots', 'num'], n: 6 } : { yr: 4, kinds: ['num', 'sum', 'dec', 'frac'], n: 12 },
     make: c => cmpQ(c.yr, c.kinds),
     // only the kinds that year has go in the record key (Year 1 dots and numbers, Year 2 numbers, Year 4 numbers, sums, fractions, Year 5 decimals too)
-    key: c => { const has = c.yr === 1 ? ['dots', 'num'] : c.yr === 2 ? ['num'] : c.yr === 3 ? ['num', 'sum'] : c.yr === 5 ? ['num', 'sum', 'dec', 'frac'] : ['num', 'sum', 'frac'], k = has.filter(x => c.kinds.includes(x)); return `cmp~${c.yr}|${(k.length ? k : [has[0]]).join(',')}|${c.n}`; },
+    key: c => { const has = c.yr === 1 ? ['dots', 'num'] : c.yr === 2 ? ['num'] : c.yr === 3 ? ['num', 'sum', 'frac'] : c.yr === 5 ? ['num', 'sum', 'dec', 'frac'] : ['num', 'sum', 'frac'], k = has.filter(x => c.kinds.includes(x)); return `cmp~${c.yr}|${(k.length ? k : [has[0]]).join(',')}|${c.n}`; },
     label: k => { const [y, kinds, n] = k.split('|'); return `More or less · Year ${y} · ${kinds.split(',').map(x => ({ dots: 'dots', num: 'numbers', sum: 'sums', dec: 'decimals', frac: 'fractions' })[x]).join(', ')} · ${n} questions`; },
   },
   bal: {
