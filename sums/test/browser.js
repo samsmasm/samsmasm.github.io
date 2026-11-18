@@ -106,7 +106,7 @@ const fakeSpeech = () => {
   await page.click('#yPrev');
   const y3 = await tiles('#actTiles');
   ok(await page.evaluate(() => view === 3 && $('#yView').textContent === 'Year 3' && $('#yMine').textContent === ''), '‹ goes to the Year 3 page');
-  ok(y3.length === 23 && ['Rounding', 'True or false', 'More or less', 'Balance'].every(t => y3.includes(t)) && y3.includes('Arrays') && y3.includes('Clocks'), 'Year 3 page: year activities at Year 3 plus the older tiles ' + y3.join());
+  ok(y3.length === 25 && ['Rounding', 'Splat', 'Number bonds', 'True or false', 'More or less', 'Balance'].every(t => y3.includes(t)) && y3.includes('Arrays') && y3.includes('Clocks'), 'Year 3 page: year activities at Year 3 plus the older tiles ' + y3.join());
   await page.click('#actTiles [data-act="clock"]');
   ok(await page.evaluate(() => draft.yr === 3 && $('.sughint').textContent === 'From the page for: Year 3'), 'Clocks from the Year 3 page opens at Year 3');
   await page.click('#backBtn');
@@ -876,7 +876,7 @@ const fakeSpeech = () => {
     const bad = [];
     const nums = q => q.kind === 'expr' ? (([a, , b]) => [+a, +b])(q.text.split(' ')) : [q.a, q.b];
     const lim = { 1: [20, 20], 2: [120, 120], 3: [999, 999], 4: [9999, 9999] };
-    const y2 = new Set();
+    const y2 = new Set(), y3h = new Set(); let y3n = 0;
     for (const yr of [1, 2, 3, 4]) for (const op of ['+', '-', '*', '/']) for (let i = 0; i < 300; i++) {
       const q = (op === '+' || op === '-' ? addSubQ : mulDivQ)(op, yr);
       if (yr === 2 && op === '+' && q.text.split(' + ').length === 3) { // D1a: three one-digit numbers, across, read aloud
@@ -898,12 +898,18 @@ const fakeSpeech = () => {
       const [a, b] = nums(q);
       const want = { '+': a + b, '-': a - b, '*': a * b, '/': a / b }[op];
       if (q.ans !== want || !Number.isInteger(q.ans) || q.ans < 0) bad.push(`${yr} wrong ${JSON.stringify(q)}`);
+      if (yr === 3 && q.hund) { // E1b: hundreds facts across, 700 + 200, 900 − 300, within 1,000, never 0
+        y3h.add(op); y3n++;
+        if (q.kind !== 'expr' || a % 100 || b % 100 || !a || !b || q.ans <= 0 || q.ans > 1000 || q.say !== `${a} ${op === '+' ? 'plus' : 'take away'} ${b}`) bad.push('3 hundreds ' + JSON.stringify(q));
+        continue;
+      }
       if (q.kind !== (yr <= 2 || op === '/' ? 'expr' : 'col')) bad.push(`${yr} layout ${JSON.stringify(q)}`); // division is never the long-division bracket (a Year 5 method)
       if ((op === '+' || op === '-') && (Math.max(a, b, q.ans) > lim[yr][0] || (yr === 3 && a < 100) || (yr === 4 && a < 1000))) bad.push(`${yr} size ${JSON.stringify(q)}`);
       if (op === '*' && yr <= 2 && ![2, 5, 10].includes(a) && ![2, 5, 10].includes(b)) bad.push(`${yr} times ${JSON.stringify(q)}`);
       if (op === '/' && (b < 2 || b > 10 || (yr <= 2 && ![2, 5, 10].includes(b)))) bad.push(`${yr} divide ${JSON.stringify(q)}`);
     }
     if (y2.size !== 5) bad.push('Year 2 kinds ' + [...y2]);
+    if (y3h.size !== 2 || y3n < 130 || y3n > 270) bad.push('Year 3 hundreds facts ' + [...y3h] + ' ' + y3n + ' of 600');
     return bad.slice(0, 4);
   });
   // Year 5 (C1): six digits stacked or hundredths across; tables to 12, 4 digits × 1, 2 digits × 2; ÷ with a remainder in the bracket
@@ -2934,6 +2940,70 @@ const fakeSpeech = () => {
     ok((await writeAllAndMark()).length === 0, `${a} Year 3 (${c.n}): read and marked right`);
   }
 
+  // ---- E1b: complements to 100 (Splat hundred square, Number bonds up to 100) and Add and take away 700 + 200
+  const e1b = await page.evaluate(() => {
+    const bad = [], seen = new Set();
+    let tens = 0;
+    // distance from a point to a segment
+    const segD = (px, py, [ax, ay], [bx, by]) => { const t = Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2))); return Math.hypot(px - ax - t * (bx - ax), py - ay - t * (by - ay)); };
+    const inside = (x, y, P) => { let k = false; P.forEach((a, i) => { const b = P[(i + 1) % P.length]; if ((a[1] > y) !== (b[1] > y) && x < a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1])) k = !k; }); return k; };
+    for (let i = 0; i < 600; i++) { // Splat Year 3: a hundred square, one blot over the last dots
+      const q = splatQ(3);
+      if (q.kind !== 'splat' || q.total !== 100 || q.showing < 10 || q.showing > 90 || q.ans !== 100 - q.showing || q.hid !== q.ans || q.say !== `100 altogether. ${q.showing} showing. How many are hiding?` || cardSay(q) !== q.say) bad.push('splat3 ' + JSON.stringify(q));
+      if (q.showing % 10 === 0) tens++; else seen.add('splat any');
+      const d = new DOMParser().parseFromString(`<div>${splatSvg(q)}</div>`, 'text/html');
+      const dots = [...d.querySelectorAll('circle[fill="currentColor"]')].map(c => [+c.getAttribute('cx'), +c.getAttribute('cy'), +c.getAttribute('r')]);
+      const P = d.querySelector('.blot path').getAttribute('d').replace(/[MZ]/g, '').split('L').map(p => p.trim().split(' ').map(Number));
+      const half = +d.querySelector('.blot path').getAttribute('stroke-width') / 2;
+      const lobes = [...d.querySelectorAll('.lobe')].map(c => ['cx', 'cy', 'r'].map(k => +c.getAttribute(k)));
+      if (dots.length !== 100) bad.push('splat3 dots ' + dots.length);
+      let covered = 0;
+      dots.forEach(([x, y, r], j) => {
+        const idx = Math.floor(y / 10) * 10 + Math.floor(x / 10), edge = Math.min(...P.map((a, k) => segD(x, y, a, P[(k + 1) % P.length])));
+        if (inside(x, y, P)) { covered++; if (idx < q.showing) bad.push('splat3 a showing dot is under the blot ' + idx); if (edge < r) bad.push('splat3 dot half under'); }
+        else {
+          if (idx >= q.showing) bad.push('splat3 a hidden dot shows ' + idx + ' ' + q.showing);
+          if (edge - half < r + 0.5) bad.push('splat3 blot edge touches a dot ' + (edge - half).toFixed(2));
+          lobes.forEach(([lx, ly, lr]) => { if (Math.hypot(x - lx, y - ly) < lr + r + 0.5) bad.push('splat3 lobe on a dot'); });
+        }
+      });
+      if (covered !== q.hid) bad.push('splat3 covered ' + covered + ' of ' + q.hid);
+      if (lobes.some(([x, y]) => x > 0 && x < 100 && y < 100)) bad.push('splat3 a lobe inside the square');
+    }
+    if (tens < 150 || tens > 260) bad.push('splat3 tens ' + tens + ' of 600');
+    let hundreds = 0; tens = 0;
+    for (let i = 0; i < 600; i++) { // Number bonds up to 100
+      const q = ACTS.bonds.make({ max: 100, n: 12 });
+      if (q.kind !== 'bond' || q.w !== q.p + q.q2 || q.p < 1 || q.q2 < 1 || q.w % 10 || q.w < 30 || q.w > 100 || q.ans !== q[q.hide] || q.tens !== (q.p % 10 === 0)) bad.push('bond100 ' + JSON.stringify(q));
+      if (q.tens) tens++; hundreds += q.w === 100;
+      seen.add('hide ' + q.hide);
+    }
+    if (tens < 180 || tens > 300 || hundreds < 390 || hundreds > 510) bad.push('bond100 tens ' + tens + ', wholes of 100 ' + hundreds + ' of 600');
+    if (range(0, 300).some(() => { const q = ACTS.bonds.make({ max: 20, n: 6 }); return q.w > 20 || 'tens' in q; })) bad.push('bonds up to 20 changed');
+    // tens first on the sheet
+    const qs = ACTS.bonds.order(range(0, 12).map(() => bond100Q())), firstAny = qs.findIndex(q => !q.tens);
+    if (firstAny >= 0 && qs.slice(firstAny).some(q => q.tens)) bad.push('bond100 order');
+    ['splat any', 'hide w', 'hide p', 'hide q2'].forEach(w => { if (!seen.has(w)) bad.push('never saw ' + w); });
+    return bad.slice(0, 5);
+  });
+  ok(e1b.length === 0, 'Year 3 complements to 100: Splat hundred square (100 altogether, 10 to 90 showing, a third tens, the blot over exactly the hidden dots), Number bonds up to 100 (wholes of 100 or tens, tens first, then any) ' + e1b.join(' | '));
+  ok(await page.evaluate(() => [ACTS.splat.key({ yr: 3, n: 6 }), labelFor('splat~3|12'), ACTS.bonds.key({ max: 100, n: 12 }), labelFor('bonds~100|12'), ACTS.bonds.defaults(8).max, ACTS.bonds.defaults(5).max, ACTS.splat.defaults(8).yr, ACTS.splat.defaults(5).yr, yearsOf('splat').join(''),
+    [1, 2, 3, 4, 5].map(v => +onPage('bonds', v)).join('')].join(' / '))
+    === 'splat~3|6 / Splat · Year 3 · 12 questions / bonds~100|12 / Number bonds · up to 100 · 12 questions / 100 / 10 / 3 / 1 / 123 / 11100', 'Splat Year 3 and Number bonds up to 100: keys, labels, defaults; Number bonds on the Year 1 to 3 pages');
+  for (const [a, c] of [['splat', { yr: 3, n: 6 }], ['splat', { yr: 3, n: 12 }], ['bonds', { max: 100, n: 12 }], ['bonds', { max: 100, n: 6 }], ['addsub', { yr: 3, ops: ['+', '-'], n: 12 }]]) {
+    await page.evaluate((a, c) => { hideDone(); act = a; buildSheet(c); show('sheet'); }, a, c);
+    ok((await fits()).length === 0, `${a} Year 3 (${c.n}) fits ` + (await fits()).join(' '));
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/48-${a}-y3-${c.n}.png` });
+    if (a === 'splat') ok(await page.evaluate(() => cards.every(c => c.el.querySelector('.cap').innerText.replace(/\s+/g, ' ') === `100 altogether ${c.q.showing} showing`)), 'Splat Year 3: "100 altogether" and "34 showing" printed');
+    if (a === 'bonds') ok(await page.evaluate(() => { const i = cards.findIndex(c => !c.q.tens); return i < 0 || cards.slice(i).every(c => !c.q.tens); }), 'Number bonds up to 100: the tens cards first on the sheet');
+    ok((await writeAllAndMark()).length === 0, `${a} Year 3 (${c.n}): read and marked right`);
+  }
+  // a Year 3 sheet with hundreds facts across among the stacked sums
+  await page.evaluate(() => { hideDone(); act = 'addsub'; buildSheet({ yr: 3, ops: ['+', '-'], n: 12 }); for (let i = 0; i < 4; i++) { let q; do q = addSubQ(pickOne(['+', '-']), 3); while (!q.hund); cards[i].q = q; layout(cards[i]); sizeCanvas(cards[i]); } });
+  ok((await fits()).length === 0, 'Add and take away Year 3 with 700 + 200 across fits ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/48-addsub-y3-hund.png' });
+  ok((await writeAllAndMark()).length === 0, 'Add and take away Year 3: 700 + 200 across read and marked right');
+
   // ---- Money, Make it (Year 4): drop coins and notes in a tray. A7
   const mkq = await page.evaluate(() => {
     const bad = [];
@@ -3363,7 +3433,8 @@ const fakeSpeech = () => {
       ['area', { kinds: ['lperim'], max: 12, n: 12 }], ['area', { kinds: ['same'], max: 12, n: 12 }], ['area', { kinds: ['layers'], max: 12, n: 12 }], ['map', { yr: 5, kinds: ['tap'], n: 6 }],
       ['shape', { yr: 5, kinds: ['nets'], n: 12 }], ['shape', { yr: 5, kinds: ['flat'], n: 12 }], ['shape', { yr: 5, kinds: ['solid'], n: 12 }],
       ['turn', { yr: 2, n: 12 }], ['map', { yr: 2, kinds: ['tap'], n: 6 }],
-      ['tf', { yr: 3, n: 12 }], ['cmp', { yr: 3, kinds: ['num', 'sum'], n: 12 }], ['bal', { yr: 3, n: 12 }], ['round', { yr: 3, kinds: ['line', 'num'], n: 12 }]]) {
+      ['tf', { yr: 3, n: 12 }], ['cmp', { yr: 3, kinds: ['num', 'sum'], n: 12 }], ['bal', { yr: 3, n: 12 }], ['round', { yr: 3, kinds: ['line', 'num'], n: 12 }],
+      ['splat', { yr: 3, n: 12 }], ['bonds', { max: 100, n: 12 }], ['addsub', { yr: 3, ops: ['+', '-'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

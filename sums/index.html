@@ -551,9 +551,10 @@ const nearestOf = (ys, w) => ys.reduce((b, y) => Math.abs(y - w) < Math.abs(b - 
 const suggestedYear = a => nearestOf(yearsOf(a), view);
 // year pages: every year some activity has (Years 1–4 so far). An activity with a
 // Year row is on exactly its own years; one without is on the pages of its tile set
-// (younger: Years 1–2, older: 3 up), and the original Sums is on every page.
+// (younger: Years 1–2, older: 3 up), or on its own `pages` if it lists them
+// (Number bonds: Years 1 to 3), and the original Sums is on every page.
 const pageYears = () => [...new Set(Object.keys(ACTS).flatMap(yearsOf))].sort((x, y) => x - y);
-const onPage = (a, v) => maxYear(a) ? yearsOf(a).includes(v) : ACTS[a].ages.includes(v <= 2 ? 5 : 8);
+const onPage = (a, v) => maxYear(a) ? yearsOf(a).includes(v) : ACTS[a].pages ? ACTS[a].pages.includes(v) : ACTS[a].ages.includes(v <= 2 ? 5 : 8);
 // 1 January: everyone goes up a year (Sam). `yy` is the calendar year her year is for.
 function rollYears(list, now = new Date()) {
   const cy = now.getFullYear();
@@ -1232,6 +1233,12 @@ function addSubQ(op, yr) {
       }
     } else { // Year 3 within 1,000, Year 4 four digits, Year 5 five and six digits (or hundredths, across)
       if (yr === 5 && Math.random() < 0.35) return hundredthsQ(op);
+      // Year 3 (E1b): a third are hundreds facts printed across (700 + 200, 900 − 300; 7 + 2 = 9 so 700 + 200 = 900)
+      if (yr === 3 && Math.random() < 1 / 3) {
+        const x = op === '+' ? rnd(1, 9) : rnd(2, 10), y = op === '+' ? rnd(1, 10 - x) : rnd(1, x - 1);
+        if (op === '+' && x + y > 10) continue;
+        return { kind: 'expr', text: `${x * 100} ${SIGN[op]} ${y * 100}`, say: `${x * 100} ${WORD[op]} ${y * 100}`, hund: true, ans: op === '+' ? (x + y) * 100 : (x - y) * 100 };
+      }
       const big = yr === 3 ? [100, 999] : yr === 4 ? [1000, 9999] : [10000, 999999];
       a = rnd(...big); b = pickOne(yr === 3 ? [rnd(1, 9), rnd(10, 99), rnd(100, 999)] : yr === 4 ? [rnd(10, 99), rnd(100, 999), rnd(1000, 9999)] : [rnd(100, 9999), rnd(1000, 99999), rnd(10000, 999999)]);
       if (op === '+' && a + b > big[1]) continue;
@@ -3253,6 +3260,7 @@ function patSvg(row, gap) {
 // dots beside it stay whole. Totals 6 to 20, half of them within 10 (one frame).
 function splatQ(yr = 1) {
   if (yr === 2) return splat2Q();
+  if (yr === 3) return splat3Q();
   const total = Math.random() < 0.5 ? rnd(6, 10) : rnd(11, 20), last = total > 10 ? total - 10 : total;
   const row = last > 5 ? 1 : 0, inRow = last - row * 5, hid = rnd(1, inRow);
   return { kind: 'splat', total, hid, row, from: last - hid, say: `${total} altogether. How many are hiding?`, ans: hid };
@@ -3280,7 +3288,38 @@ function splat2Q() {
   }
   return { kind: 'splat', yr: 2, total: 14, showing: 4, k: 5, blots: [{ f: 0, r: 0, s: 0 }, { f: 1, r: 0, s: 0 }], say: '14 altogether. 4 showing. The same number under each blot. How many under one?', ans: 5 };
 }
+// Year 3 (E1b): complements to 100. A hundred square, the first dots showing in
+// reading order and one blot over the rest: "100 altogether, 34 showing". A third
+// of the cards are tens (30 showing); 10 to 90 showing, so the bottom row is always under the blot.
+function splat3Q() {
+  const showing = Math.random() < 1 / 3 ? rnd(1, 9) * 10 : pickOne(range(11, 89).filter(n => n % 10)), hid = 100 - showing;
+  return { kind: 'splat', yr: 3, total: 100, showing, hid, say: `100 altogether. ${showing} showing. How many are hiding?`, ans: hid };
+}
+// Number bonds, Up to 100 (E1b): complements to 100. The whole is 100 three times in
+// four, else a tens number (30 to 90); 2 in 5 cards split into tens (30 and 70, `tens`,
+// first on the sheet), the rest into any two numbers (34 and 66). No part is 0.
+function bond100Q() {
+  const w = Math.random() < 0.75 ? 100 : rnd(3, 9) * 10, tens = Math.random() < 0.4;
+  const p = tens ? rnd(1, w / 10 - 1) * 10 : pickOne(range(1, w - 1).filter(n => n % 10)), q2 = w - p, hide = pickOne(['w', 'p', 'q2']);
+  return { kind: 'bond', w, p, q2, hide, tens, ans: { w, p, q2 }[hide] };
+}
+// the hundred square: 10 rows of 10 dots in cells 10 wide, a thicker line down the
+// middle (fives, as in a ten frame). The blot follows the cell edges round the hidden
+// dots (a thick round-joined edge, so the corners are soft), with lobes outside the square.
+function hundredSvg(q) {
+  const r = Math.floor(q.showing / 10), c = q.showing % 10;
+  let s = `<rect x="0" y="0" width="100" height="100" fill="none" stroke="${INK}" stroke-width=".8"/>`;
+  for (let i = 1; i < 10; i++) s += `<line x1="${i * 10}" y1="0" x2="${i * 10}" y2="100" stroke="${INK}" stroke-width="${i === 5 ? 0.8 : 0.3}"/><line x1="0" y1="${i * 10}" x2="100" y2="${i * 10}" stroke="${INK}" stroke-width=".3"/>`;
+  for (let i = 0; i < 100; i++) s += `<circle cx="${(i % 10) * 10 + 5}" cy="${Math.floor(i / 10) * 10 + 5}" r="3.2" fill="currentColor"/>`;
+  const pts = c ? [[c * 10, r * 10], [100, r * 10], [100, 100], [0, 100], [0, r * 10 + 10], [c * 10, r * 10 + 10]] : [[0, r * 10], [100, r * 10], [100, 100], [0, 100]];
+  const top = c ? r + 1 : r, mid = (top * 10 + 100) / 2; // the rows wholly under the blot
+  const lobes = [[30 + (q.showing % 4) * 12, 101.8, 3.2], [101.8, mid, 2.6], [8, 102, 1.8], [-1.6, Math.min(mid + 10, 95), 1.6]];
+  s += `<g fill="${SHADE}" class="blot"><path d="M${pts.map(p => p.join(' ')).join('L')}Z" stroke="${SHADE}" stroke-width="1.6" stroke-linejoin="round"/>`
+    + lobes.map(([x, y, rr]) => `<circle class="lobe" cx="${x}" cy="${y}" r="${rr}"/>`).join('') + '</g>';
+  return `<svg ${emBox([-4, -2, 108, 108], 0.068)} stroke="none">${s}</svg>`;
+}
 function splatSvg(q) {
+  if (q.yr === 3) return hundredSvg(q);
   const frames = Math.ceil(q.total / 10), H = 20 + 26 * (frames - 1), E = frames > 2 ? 0.085 : 0.1;
   let s = '';
   for (let f = 0; f < frames; f++) s += `<g transform="translate(0 ${f * 26})">${frameInner(f < frames - 1 ? 10 : q.total - 10 * (frames - 1))}</g>`;
@@ -3674,17 +3713,21 @@ const ACTS = {
     label: k => { const [m, n, kinds] = k.split('|'); return `How many? · ${kinds ? kinds.split(',').map(x => x === 'frame' ? 'ten frame' : 'groups').join(', ') + ' · ' : ''}up to ${m} · ${n} questions`; },
   },
   bonds: {
-    name: 'Number bonds', ages: [5], setup: 'opts', say: 'What number goes in the empty circle?',
-    options: [{ key: 'max', label: 'Up to', values: [5, 10, 20] }],
+    // Up to 100 (E1b): complements to 100 for Year 3, so it is on the Year 1 to 3 pages
+    name: 'Number bonds', ages: [5, 8], pages: [1, 2, 3], setup: 'opts', say: 'What number goes in the empty circle?',
+    options: [{ key: 'max', label: 'Up to', values: [5, 10, 20, 100] }],
     pic: bondSvg({ w: 5, p: 2, q2: 3, hide: 'q2' }),
-    defaults: () => ({ max: 10, n: 6 }),
+    defaults: g => g === 5 ? { max: 10, n: 6 } : { max: 100, n: 12 },
     // a whole split into two parts; one of the three circles is empty (the whole a third of the time)
     make: c => {
+      if (c.max === 100) return bond100Q();
       // a part of 0 only now and then (plain random gave it on half the cards)
       const w = rnd(2, c.max), p = Math.random() < 0.1 ? pickOne([0, w]) : rnd(1, w - 1), q2 = w - p;
       const hide = pickOne(['w', 'p', 'q2']);
       return { kind: 'bond', w, p, q2, hide, ans: { w, p, q2 }[hide] };
     },
+    // Up to 100: the tens cards (30 and 70) come first on the sheet, then any number (34 and 66)
+    order: qs => [...qs.filter(q => q.tens), ...qs.filter(q => !q.tens)],
     key: c => `bonds~${c.max}|${c.n}`,
     label: k => { const [m, n] = k.split('|'); return `Number bonds · up to ${m} · ${n} questions`; },
   },
@@ -3836,10 +3879,11 @@ const ACTS = {
   },
   // Clocks and Money go up through the years (NZ curriculum, sums/CURRICULUM.md)
   splat: { // a blot hides some of the dots: total on top, how many are hiding?
+    // ages stays [5]: with a Year row the pages come from the years (Year 3 since E1b)
     name: 'Splat', ages: [5], setup: 'opts', say: 'How many are hiding?',
     pic: `<svg viewBox="0 0 120 84"><rect x="12" y="22" width="96" height="40" fill="none" stroke="${INK}" stroke-width="3"/>${[1, 2, 3, 4].map(i => `<line x1="${12 + i * 19.2}" y1="22" x2="${12 + i * 19.2}" y2="62" stroke="${INK}" stroke-width="1.5"/>`).join('')}<line x1="12" y1="42" x2="108" y2="42" stroke="${INK}" stroke-width="1.5"/>${[0, 1, 2].map(i => `<circle cx="${21.6 + i * 19.2}" cy="32" r="6.5" fill="${INK}"/>`).join('')}<path d="M62 52H98" stroke="${SHADE}" stroke-width="19" stroke-linecap="round"/><circle cx="80" cy="45" r="4" fill="${SHADE}"/></svg>`,
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · totals 6 to 20'], [2, '2 · to 30, two or three blots']] }],
-    defaults: () => ({ yr: 1, n: 6 }),
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · totals 6 to 20'], [2, '2 · to 30, two or three blots'], [3, '3 · 100 altogether']] }],
+    defaults: g => ({ yr: g === 5 ? 1 : 3, n: 6 }),
     make: c => splatQ(c.yr),
     key: c => `splat~${c.yr}|${c.n}`,
     label: k => { const [y, n] = k.split('|'); return `Splat · Year ${y} · ${n} questions`; },
@@ -4726,8 +4770,8 @@ function qMarkup(q) {
   // Splat: the total as a big numeral, ten frames with a blot over some dots; answer anywhere below
   if (q.kind === 'splat') {
     const svg = splatSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
-    // Year 2: "4 showing" on a second line
-    const more = q.yr === 2 ? `<br><b>${q.showing}</b> showing` : '';
+    // Years 2 and 3: "4 showing" on a second line
+    const more = q.yr >= 2 ? `<br><b>${q.showing}</b> showing` : '';
     return { cls: 'frame', html: `<div class="cap"><b>${q.total}</b> altogether${more}</div>${svg}`, vars: { '--h': hEm + 2.3 + (more ? 1.7 : 0) + 3.2, '--c': Math.max(wEm, 6.4) + 1.2 } };
   }
   // Half of 8, A quarter of 12: the dots in groups with a dashed sharing line; answer anywhere below
@@ -4811,7 +4855,7 @@ function makeSheet(c) {
     for (let t = 0; t < 30; t++) { q = ACTS[act].make(c); if (!seen.has(qId(q))) break; }
     seen.add(qId(q)); qs.push(q);
   }
-  return qs;
+  return ACTS[act].order ? ACTS[act].order(qs) : qs;
 }
 function buildSheet(c) {
   cfg = c; sheetAct = act; playScreen = 'sheet';

@@ -146,9 +146,9 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Count in 10s and 100s from any number to 1,000. ✓ (Place value: 10 more / 10 less, Number lines)
 
 ### Operations
-- Complements to 100 (34 + __ = 100).
+- Complements to 100 (34 + __ = 100). ✓ (Splat, Year 3: a hundred square, "100 altogether, 34 showing"; Number bonds, Up to 100: tens first, then any number)
 - Add and subtract within 1,000 (329 + 3, 329 + 80, 329 − 200, 137 + 54), including column methods with regrouping. ✓ (Sums)
-- Derive facts with place value (7 + 2 = 9 so 700 + 200 = 900).
+- Derive facts with place value (7 + 2 = 9 so 700 + 200 = 900). ✓ (Add and take away, Year 3: about a third hundreds facts across, 700 + 200, 900 − 300)
 - One-step + and − word problems to 1,000; two-step to 100. ✓ (Story sums, Year 3)
 - Times tables and division facts for 2, 3, 4, 5, 8 and 10. ✓ (Times bonds, Times grid)
 - Multiply and divide by sharing, grouping, repeated adding or known facts. ✓ (Arrays)
