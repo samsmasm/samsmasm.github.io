@@ -326,15 +326,17 @@ Year 5 buttons so far (C1, C2a, C2b, C3a, C3b, C3c, 2026-11-17): Add and take aw
 
 ## Year 6
 
+Year 6 buttons so far (F1a, 2026-11-19): Order (new), True or false.
+
 ### Number
 - Read, write, compare and order any whole number.
 - Factor pairs of any product up to 12 × 12.
 - Round to the nearest 10 up to the nearest million; round hundredths to the nearest whole or tenth.
-- Square and cube numbers and the ² and ³ signs. Knows: squares to 144, cubes to 125.
+- Square and cube numbers and the ² and ³ signs. Knows: squares to 144, cubes to 125. ✓ partly (Order, Year 6: squares inside sums, 5 + 3², (4 + 8)²; not cubes; F1a)
 - Count forwards and backwards with negative numbers (from −6, back in 2s).
 
 ### Operations
-- Order of operations: brackets, then squaring, then × and ÷ left to right, then + and − left to right.
+- Order of operations: brackets, then squaring, then × and ÷ left to right, then + and − left to right. ✓ (Order, Year 6: pairs of sums that differ only in their brackets, 3 + 4 × 2 and (3 + 4) × 2, 10 − 4 + 3 and 10 − (4 + 3); F1a)
 - Add and subtract any whole numbers.
 - Multiply any whole number by a two-digit number (542 × 12).
 - Divide up to a five-digit number by one digit, with a remainder (1283 ÷ 5 = 256 remainder 3).
@@ -353,7 +355,7 @@ Year 5 buttons so far (C1, C2a, C2b, C3a, C3b, C3c, 2026-11-17): Add and take aw
 - 10%, 25% and 50% of whole dollar amounts (50% of $280); is there enough money?
 
 ### Algebra
-- True or false and open number sentences with all four operations, ≤ and ≥, and the order of operations (8 × 7 ≤ 8 × 5 + 4²?).
+- True or false and open number sentences with all four operations, ≤ and ≥, and the order of operations (8 × 7 ≤ 8 × 5 + 4²?). ✓ partly (True or false, Year 6: an Order sum against a number or a short sum, =, ≤, ≥, < and >; open sentences not yet; F1a)
 - Put a growing pattern's rule into words and predict later terms.
 - Make a table of values from a rule and plot it as (x, y) points, including points on the axes.
 

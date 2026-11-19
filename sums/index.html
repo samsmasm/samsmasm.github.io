@@ -2210,6 +2210,7 @@ function tfQ(yr) {
   if (yr === 2) return tf2Q();
   if (yr === 3) return tf3Q();
   if (yr === 5) return tf5Q();
+  if (yr === 6) return tf6Q();
   for (let t = 0; t < 200; t++) {
     const truth = Math.random() < 0.5, type = pickOne(['addsub', 'addsub', 'tables', 'tables', 'ten', 'both']);
     let lhs, v, rhs, rv; // each side as printed, and what it comes to
@@ -2246,6 +2247,93 @@ function tfQ(yr) {
     return { kind: 'tap', text, top: text, tc: text.length * 0.56, tiles: TF_TILES, right: truth ? 0 : 1, truth, say: `${signWords(text)}. True?`, ans: truth ? '✓' : '✗' };
   }
   return { kind: 'tap', text: '6 × 4 = 24', top: '6 × 4 = 24', tc: 5.6, tiles: TF_TILES, right: 0, truth: true, say: '6 times 4 equals 24. True?', ans: '✓' };
+}
+// ---------- Order (Year 6, F1a): brackets, then squares, then × ÷, then + −, left to right ----------
+// evalOrder works a sum out the way the curriculum says; NaN if a division is
+// not exact or a take away goes below 0 on the way (so nothing needs fractions).
+function evalOrder(s) {
+  const tk = s.match(/\d+|[-+−×÷()²]/g) || [];
+  let i = 0, bad = false;
+  const atom = () => { const t = tk[i++]; if (t === '(') { const v = expr(); i++; return v; } return +t; };
+  const power = () => { let v = atom(); while (tk[i] === '²') { i++; v *= v; } return v; };
+  const term = () => { let v = power(); while (tk[i] === '×' || tk[i] === '÷') { const op = tk[i++], w = power(); if (op === '×') v *= w; else { if (!w || v % w) bad = true; v /= w; } } return v; };
+  const expr = () => { let v = term(); while (tk[i] === '+' || tk[i] === '−') { const op = tk[i++], w = term(); v = op === '+' ? v + w : v - w; if (v < 0) bad = true; } return v; };
+  const v = expr();
+  return bad || i !== tk.length ? NaN : v;
+}
+// spoken: "bracket 3 plus 4 close bracket times 2", "5 plus 3 squared"
+const orderWords = s => signWords(s.replace(/\(/g, 'bracket ').replace(/\)/g, ' close bracket').replace(/²/g, ' squared'));
+// Two sums that differ only in their brackets, [plain, with brackets] (or the
+// other way round for the squared ones). Both answers whole, 1 to 200, different.
+const ORDER_T = [
+  (a, b, c) => [`${a} + ${b} × ${c}`, `(${a} + ${b}) × ${c}`],
+  (a, b, c) => [`${a} × ${b} + ${c}`, `${a} × (${b} + ${c})`],
+  (a, b, c) => [`${a * 3} − ${b} × ${c}`, `(${a * 3} − ${b}) × ${c}`],
+  (a, b, c) => [`${a} × ${b} − ${c}`, `${a} × (${b} − ${c})`],
+  (a, b, c) => [`${a * 4} − ${b * c} ÷ ${c}`, `(${a * 4} − ${b * c}) ÷ ${c}`],
+  (a, b, c) => [`${a * 2} + ${b * c} ÷ ${c}`, `(${a * 2} + ${b * c}) ÷ ${c}`],
+  (a, b, c) => [`${a * 3} − ${b} + ${c}`, `${a * 3} − (${b} + ${c})`],
+  (a, b, c) => [`${a * b * c} ÷ ${b} × ${c}`, `${a * b * c} ÷ (${b} × ${c})`],
+  (a, b) => [`${a} + ${b}²`, `(${a} + ${b})²`],
+  (a, b) => [`${a} × ${b}²`, `(${a} × ${b})²`],
+  (a, b, c) => [`(${a} + ${b})² − ${c * 2}`, `${a} + ${b}² − ${c * 2}`],
+];
+function orderPair(t = rnd(0, ORDER_T.length - 1)) {
+  for (let k = 0; k < 400; k++) {
+    const [x, y] = ORDER_T[t](rnd(1, 10), rnd(2, 9), rnd(2, 6)), u = evalOrder(x), v = evalOrder(y);
+    if (!Number.isInteger(u) || !Number.isInteger(v) || u < 1 || v < 1 || u > 200 || v > 200 || u === v) continue;
+    return [{ kind: 'expr', text: x, say: orderWords(x), t, ans: u }, { kind: 'expr', text: y, say: orderWords(y), t, ans: v }];
+  }
+  return [{ kind: 'expr', text: '3 + 4 × 2', say: orderWords('3 + 4 × 2'), t: 0, ans: 11 }, { kind: 'expr', text: '(3 + 4) × 2', say: orderWords('(3 + 4) × 2'), t: 0, ans: 14 }];
+}
+const orderQ = () => pickOne(orderPair());
+// a sheet is pairs side by side, each pair a different kind of sum where it can be
+function orderSheet(n) {
+  const kinds = shuffled(range(0, ORDER_T.length - 1)), out = [], seen = new Set();
+  for (let p = 0; out.length < n && p < 200; p++) {
+    const pr = orderPair(kinds[(out.length / 2) % kinds.length]);
+    if (pr.some(q => seen.has(q.text))) continue;
+    pr.forEach(q => seen.add(q.text));
+    out.push(...(Math.random() < 0.5 ? pr : pr.reverse()));
+  }
+  return out.slice(0, n);
+}
+// True or false, Year 6 (F1a): an Order sum against a number (its answer, the
+// answer with the brackets read wrong, or one or two off) or against a short
+// sum of its own (8 × 7 ≤ 8 × 5 + 4²), with =, ≤, ≥ and sometimes < or >.
+// "≤" is true when both sides are equal. About half true.
+const SIGN6_WORD = { ...SIGN_WORD, '≤': 'is less than or equal to', '≥': 'is more than or equal to' };
+const FLIP6 = { '<': '>', '>': '<', '≤': '≥', '≥': '≤', '=': '=' }; // the sides swapped
+const NEG6 = { '<': '≥', '>': '≤', '≤': '>', '≥': '<' }; // the opposite
+function side6(w) { // a short sum that comes to w: 7 × 8, 8 × 5 + 4², 23 + 19
+  const fs = [];
+  for (let a = 2; a <= 12; a++) if (w % a === 0 && w / a >= 2 && w / a <= 12) fs.push(`${a} × ${w / a}`);
+  for (let c = 2; c <= 5; c++) { const r = w - c * c; for (let a = 2; a <= 9; a++) if (r > 0 && r % a === 0 && r / a >= 2 && r / a <= 9) fs.push(`${a} × ${r / a} + ${c}²`); }
+  if (w > 10) { const x = rnd(2, w - 2); fs.push(`${x} + ${w - x}`); }
+  return fs.length ? pickOne(fs) : null;
+}
+function tf6Q() {
+  for (let t = 0; t < 400; t++) {
+    const truth = Math.random() < 0.5, pr = orderPair(), i = rnd(0, 1), e = pr[i], v = e.ans, u = pr[1 - i].ans;
+    const type = Math.random() < 0.6 ? 'num' : 'both';
+    const w = pickOne([v, v, u, v + pickOne([-2, -1, 1, 2])]);
+    if (w < 1) continue;
+    const R = type === 'num' ? String(w) : side6(w);
+    if (!R || evalOrder(R) !== w) continue;
+    const r = Math.random();
+    let sign = r < 0.6 ? pickOne(['≤', '≥']) : r < 0.85 ? '=' : pickOne(['<', '>']);
+    const holds = { '=': v === w, '≤': v <= w, '≥': v >= w, '<': v < w, '>': v > w }[sign];
+    if (holds !== truth) { if (sign === '=') continue; sign = NEG6[sign]; } // ≤ that is false becomes > that is true, and so on
+
+    let lhs = e.text, rhs = R;
+    if (Math.random() < 0.4) { [lhs, rhs] = [rhs, lhs]; sign = FLIP6[sign]; }
+    const text = `${lhs} ${sign} ${rhs}`, sg = sign === '<' ? '&lt;' : sign === '>' ? '&gt;' : sign;
+    const q = { kind: 'tap', yr: 6, type, sign, text, tiles: TF_TILES, right: truth ? 0 : 1, truth, say: `${orderWords(lhs)} ${SIGN6_WORD[sign]} ${orderWords(rhs)}. True?`, ans: truth ? '✓' : '✗' };
+    if (text.length > 18) Object.assign(q, { top: `${lhs}<br>${sg} ${rhs}`, tc: Math.max(lhs.length, rhs.length + 2) * 0.56, th: 2.6, topf: 0.55 });
+    else Object.assign(q, { top: `${lhs} ${sg} ${rhs}`, tc: text.length * 0.56 });
+    return q;
+  }
+  return { kind: 'tap', yr: 6, type: 'both', sign: '≤', text: '8 × 7 ≤ 8 × 5 + 4²', top: '8 × 7 ≤ 8 × 5 + 4²', tc: 10, tiles: TF_TILES, right: 0, truth: true, say: `${orderWords('8 × 7')} ${SIGN6_WORD['≤']} ${orderWords('8 × 5 + 4²')}. True?`, ans: '✓' };
 }
 // More or less: two things with an empty box between them, tiles < = >.
 // About one in five is equal. Numbers often share their digits (4071, 4701).
@@ -4214,11 +4302,21 @@ const ACTS = {
   tf: {
     name: 'True or false', ages: [5, 8], setup: 'opts', say: 'Is it true? Tap the tick or the cross.',
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="60" y="30" text-anchor="middle" font-size="24">6 × 4 = 25</text><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="24" y="44" width="30" height="30" rx="5"/><rect x="66" y="44" width="30" height="30" rx="5"/><path d="M31 60l6 6l10 -13M74 52l14 14M88 52l-14 14"/></g></svg>`,
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, with dots'], [2, '2 · to 120, 2s 5s 10s'], [3, '3 · to 1,000, + − × ÷'], [4, '4 · four digits, tables, × 10'], [5, '5 · six digits, decimals, fractions']] }],
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, with dots'], [2, '2 · to 120, 2s 5s 10s'], [3, '3 · to 1,000, + − × ÷'], [4, '4 · four digits, tables, × 10'], [5, '5 · six digits, decimals, fractions'], [6, '6 · brackets, squares, ≤ ≥']] }],
     defaults: age => age === 5 ? { yr: 1, n: 6 } : { yr: 4, n: 12 },
     make: c => tfQ(c.yr),
     key: c => `tf~${c.yr}|${c.n}`,
     label: k => { const [y, n] = k.split('|'); return `True or false · Year ${y} · ${n} questions`; },
+  },
+  order: { // Year 6: brackets first; a sheet is pairs that differ only in their brackets
+    name: 'Order', ages: [8], setup: 'opts', say: 'Brackets first, then squares, then times and divide, then add and take away.',
+    pic: `<svg viewBox="0 0 120 70" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor" text-anchor="middle" font-size="21"><text x="60" y="28">2 + 3 × 4</text><text x="60" y="58">(2 + 3) × 4</text></svg>`,
+    options: [{ key: 'yr', label: 'Year', values: [[6, '6 · brackets, squares']] }],
+    defaults: () => ({ yr: 6, n: 12 }),
+    make: () => orderQ(),
+    sheet: c => orderSheet(c.n),
+    key: c => `order~${c.yr}|${c.n}`,
+    label: k => { const [y, n] = k.split('|'); return `Order · Year ${y} · ${n} questions`; },
   },
   cmp: {
     name: 'More or less', ages: [5, 8], setup: 'opts', say: 'More, less, or the same? Tap your answer.',
@@ -5043,6 +5141,7 @@ let penSeen = false; // once a stylus is used, ignore fingers and palms
 const ro = new ResizeObserver(entries => { for (const en of entries) en.target._card && sizeCanvas(en.target._card); });
 
 function makeSheet(c) {
+  if (ACTS[act].sheet) return ACTS[act].sheet(c); // the activity makes its whole sheet (Order: pairs)
   const seen = new Set(), qs = [];
   for (let i = 0; i < c.n; i++) {
     let q;

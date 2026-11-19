@@ -101,7 +101,7 @@ const fakeSpeech = () => {
   const Y4 = 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Fractions of a number,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance,Rounding,Decimals,Change units,Angles,Map,Times grid';
   ok((await tiles('#actTiles')).join() === Y4, 'Year 4 page: the Year 4 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · Year 4', 'title shows name and year');
-  ok(await page.evaluate(() => $('#yView').textContent === 'Year 4' && $('#yMine').textContent === 'your year' && !$('#yNext').disabled && !$('#yPrev').disabled && $('#yDots').children.length === 5), 'year switcher: Year 4, your year, Year 5 above (C1)');
+  ok(await page.evaluate(() => $('#yView').textContent === 'Year 4' && $('#yMine').textContent === 'your year' && !$('#yNext').disabled && !$('#yPrev').disabled && $('#yDots').children.length === 6), 'year switcher: Year 4, your year, Years 5 and 6 above (C1, F1a)');
   // ‹ goes down a year: Year 3 has no Year-4-only activities
   await page.click('#yPrev');
   const y3 = await tiles('#actTiles');
@@ -118,7 +118,7 @@ const fakeSpeech = () => {
   const y2 = await tiles('#actTiles');
   ok(y2.length === 24 && y2.includes('Number bonds') && y2.includes('Rounding') && y2.includes('Splat') && y2.includes('Picture patterns') && y2.includes('Halves and quarters') && y2.includes('Turns') && y2.includes('Map') && !y2.includes('Arrays'), 'Year 2 page: younger tiles, Year 2 activities ' + y2.join());
   await swipe(500, 200); await swipe(500, 200); await swipe(500, 200); await swipe(500, 200);
-  ok(await page.evaluate(() => view === 5 && $('#yNext').disabled), 'swipe left up to Year 5, and no further');
+  ok(await page.evaluate(() => view === 6 && $('#yNext').disabled), 'swipe left up to Year 6, and no further');
   await page.evaluate(() => turnPage(4 - view));
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any year,Year 4', 'name tile shows her year');
@@ -158,15 +158,18 @@ const fakeSpeech = () => {
   const sugg = await page.evaluate(() => [0, 1, 2, 3, 6, 8].map(y => {
     setYear(y); return `${y}:${view}:${group()}:${reads() ? 'r' : '-'}:${loadCfg('clock').yr}:${loadCfg('seq').yr}:${loadCfg('clock').n}`;
   }).join(' '));
-  ok(sugg === '0:1:5:r:1:1:6 1:1:5:r:1:1:6 2:2:5:r:2:2:6 3:3:8:-:3:3:12 6:5:8:-:5:5:12 8:5:8:-:5:5:12', 'year → page, tiles, read aloud, starting year: ' + sugg);
+  ok(sugg === '0:1:5:r:1:1:6 1:1:5:r:1:1:6 2:2:5:r:2:2:6 3:3:8:-:3:3:12 6:6:8:-:5:5:12 8:6:8:-:5:5:12', 'year → page, tiles, read aloud, starting year: ' + sugg);
   await page.click('#yearTiles [data-year="2"]');
   ok((await tiles('#actTiles')).length === 24 &&(await page.$eval('#title', e => e.textContent)) === 'Everyone · Year 2', 'Year 2: its own page');
   await page.click('#actTiles [data-act="graph"]');
   ok(await page.evaluate(() => draft.yr === 2 && $('.sughint').textContent === 'Your year: Year 2'), 'Year 2: Graphs starts at Year 2 and says so');
   await page.click('#backBtn'); await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
-  await page.click('#yearTiles [data-year="6"]');
-  ok(await page.evaluate(() => view === 5 && /highest so far/.test($('#yMine').textContent) && $('#yMine').textContent.includes('Year 6')), 'Year 6: the Year 5 page, marked the highest so far');
+  await page.click('#yearTiles [data-year="8"]');
+  ok(await page.evaluate(() => view === 6 && /highest so far/.test($('#yMine').textContent) && $('#yMine').textContent.includes('Year 8')), 'Year 8: the Year 6 page, marked the highest so far');
+  const p6 = await tiles('#actTiles');
+  ok(p6.includes('Order') && p6.includes('True or false') && p6.includes('Sums') && p6.includes('Arrays') && !p6.includes('Add and take away') && !p6.includes('Chance'), 'Year 6 page: Order, True or false and the older tiles without years ' + p6.join(', '));
+  await page.evaluate(() => turnPage(-1));
   const y5 = await tiles('#actTiles');
   ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums', 'Decimals', 'Money', 'Clocks', 'Change units', 'Angles', 'Map', 'Shapes', 'Graphs'].every(t => y5.includes(t)) && !y5.includes('Rulers'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
   // a new activity can start with one year only: any page opens it at the nearest year it has
@@ -1344,7 +1347,7 @@ const fakeSpeech = () => {
 
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="tf"]');
-  ok(await page.evaluate(() => draft.yr === 4 && $('#kpBlock').hidden && $('#optBlock [data-key="yr"]').children.length === 5 && $('.sughint').textContent === 'Your year: Year 4'), 'True or false setup: a Year row with Years 1 to 5, Year 4 chosen');
+  ok(await page.evaluate(() => draft.yr === 4 && $('#kpBlock').hidden && $('#optBlock [data-key="yr"]').children.length === 6 && $('.sughint').textContent === 'Your year: Year 4'), 'True or false setup: a Year row with Years 1 to 6, Year 4 chosen');
   ok(await page.$$eval('#preview .mini .tt', t => t.length) === 8, 'True or false examples show their two tiles');
   await page.click('#newBtn');
   ok(await page.evaluate(() => cards.length === 12 && cards.every(c => c.q.kind === 'tap' && c.el.classList.contains('tapc') && c.el.querySelectorAll('.tt').length === 2 && getComputedStyle(c.cv).display === 'none' && getComputedStyle(c.el.querySelector('.undo')).display === 'none' && getComputedStyle(c.el.querySelector('.clear')).display === 'none')), 'True or false sheet: every card has a tick tile and a cross tile, and nothing to write on');
@@ -1573,6 +1576,57 @@ const fakeSpeech = () => {
     return bad.slice(0, 4);
   }, val5);
   ok(t5.length === 0, 'True or false Year 5: six-digit sums, both sides to work out, decimals to two places (sometimes < or >), fractions with one bottom a multiple of the other; about half true ' + t5.join(' | '));
+
+  // ---- F1a: Order (Year 6) and True or false Year 6 with ≤ and ≥
+  const valO = `s => Function('return ' + s.replace(/(\\d+|\\([^()]*\\))²/g, '($1**2)').replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-'))()`;
+  const oq = await page.evaluate(src => {
+    const bad = [], val = eval(src), ts = new Set();
+    for (let i = 0; i < 1500; i++) {
+      const [p, q] = orderPair(); ts.add(p.t);
+      for (const x of [p, q]) {
+        const v = val(x.text);
+        if (x.kind !== 'expr' || x.ans !== v || !Number.isInteger(v) || v < 1 || v > 200) bad.push('answer ' + x.text + ' = ' + x.ans);
+        if (/[()²×÷+−]/.test(x.say) || !/^[\d ()²×÷+−]+$/.test(x.text) || x.say !== orderWords(x.text) || cardSay(x) !== x.say) bad.push('words ' + x.say);
+        if (!Number.isInteger(evalOrder(x.text))) bad.push('a step not whole ' + x.text); // evalOrder is NaN for any inexact ÷ or a step below 0
+      }
+      if (p.text.replace(/[()]/g, '') !== q.text.replace(/[()]/g, '') || p.ans === q.ans || p.text.includes('(') === q.text.includes('(')) bad.push('pair ' + p.text + ' / ' + q.text);
+    }
+    if (ts.size !== ORDER_T.length) bad.push('kinds ' + ts.size);
+    const chk = [['3 + 4 × 2', 11], ['(3 + 4) × 2', 14], ['20 − 12 ÷ 4', 17], ['(20 − 12) ÷ 4', 2], ['5 + 3²', 14], ['(2 + 3)² − 5', 20], ['2 × 3²', 18], ['10 − 4 + 3', 9], ['24 ÷ 4 × 2', 12], ['24 ÷ (4 × 2)', 3]];
+    for (const [s, v] of chk) if (evalOrder(s) !== v) bad.push(`evalOrder ${s} = ${evalOrder(s)}`);
+    if (!isNaN(evalOrder('7 ÷ 2 × 4')) || !isNaN(evalOrder('3 − 5 + 4')) || !isNaN(evalOrder('4 × (2 − 3)'))) bad.push('a step that is not whole, or below 0, is NaN');
+    if (orderWords('(3 + 4) × 2') !== 'bracket 3 plus 4 close bracket times 2' || orderWords('5 + 3²') !== '5 plus 3 squared') bad.push('spoken ' + orderWords('(3 + 4) × 2'));
+    return bad.slice(0, 4);
+  }, valO);
+  ok(oq.length === 0, 'Order: each pair is one sum with and without brackets, both answers whole (1 to 200) and different, worked out brackets, squares, × ÷, then + − left to right; spoken with "bracket" and "squared" ' + oq.join(' | '));
+  const t6 = await page.evaluate(src => {
+    const bad = [], val = eval(src), signs = new Set(), types = new Set();
+    let trues = 0, eqTrue = 0;
+    for (let i = 0; i < 1500; i++) {
+      const q = tfQ(6), [l, sign, r] = q.text.split(/ ([<=>≤≥]) /), lv = val(l), rv = val(r);
+      const holds = { '=': lv === rv, '≤': lv <= rv, '≥': lv >= rv, '<': lv < rv, '>': lv > rv }[sign];
+      if (q.kind !== 'tap' || q.truth !== holds || q.right !== (q.truth ? 0 : 1) || q.ans !== q.tiles[q.right].label) bad.push('wrong ' + q.text);
+      signs.add(sign); types.add(q.type); trues += q.truth;
+      if (lv === rv && /[≤≥]/.test(sign)) eqTrue++;
+      if (![l, r].some(s => (s.match(/[+−×÷²]/g) || []).length >= 2)) bad.push('no order sum ' + q.text);
+      if (q.type === 'num' && ![l, r].some(s => /^\d+$/.test(s))) bad.push('num without a number ' + q.text);
+      if (q.text.length > 18 && !q.top.includes('<br>')) bad.push('long on one line ' + q.text);
+      if (!/\. True\?$/.test(q.say) || /[()²<>=≤≥×÷+−]/.test(q.say)) bad.push('say ' + q.say);
+    }
+    if (trues < 650 || trues > 850) bad.push('true ' + trues + ' of 1500');
+    if (signs.size !== 5 || types.size !== 2 || eqTrue < 40) bad.push(`signs ${[...signs]} types ${[...types]} equal with ≤ ≥ ${eqTrue}`);
+    return bad.slice(0, 4);
+  }, valO);
+  ok(t6.length === 0, 'True or false Year 6: an Order sum against a number or a short sum, with =, ≤, ≥ (true when equal), < and >; about half true ' + t6.join(' | '));
+  await page.evaluate(() => { setYear(6); hideDone(); act = 'order'; buildSheet({ yr: 6, n: 12 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.length === 12 && cards.every(c => c.q.kind === 'expr' && !!c.el.querySelector('.wl')) && [0, 2, 4, 6, 8, 10].every(i => cards[i].q.text.replace(/[()]/g, '') === cards[i + 1].q.text.replace(/[()]/g, '') && cards[i].q.ans !== cards[i + 1].q.ans)
+    && new Set(cards.map(c => c.q.text)).size === 12 && new Set(cards.map(c => c.q.t)).size === 6), 'Order sheet: six pairs next to each other, each the same sum with and without brackets, six different kinds of sum');
+  ok((await fits()).length === 0, 'Order fits with room to write ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0 && await page.evaluate(() => sheetDone && loadRec(current).history[0].k === 'order~6|12'), 'Order: answers written on the line are read and marked right, record order~6|12');
+  ok(await page.evaluate(() => labelFor('order~6|12') === 'Order · Year 6 · 12 questions' && labelFor('tf~6|12') === 'True or false · Year 6 · 12 questions' && yearsOf('order').join() === '6' && ACTS.order.ages.join() === '8'
+    && countsOf('order').join() === '6,12' && onPage('order', 6) && !onPage('order', 5) && onPage('tf', 6) && ACTS.order.make({ yr: 6, n: 6 }).kind === 'expr'), 'Order: record key and label, Year 6 only, older tiles, 6 or 12 questions; True or false has a Year 6');
+  await page.evaluate(() => { act = 'tf'; buildSheet({ yr: 6, n: 12 }); show('sheet'); });
+  ok((await fits()).length === 0 && (await writeAllAndMark()).length === 0 && await page.evaluate(() => loadRec(current).history[0].k === 'tf~6|12'), 'True or false Year 6 fits, tapped right is marked right, record tf~6|12');
   const c5 = await page.evaluate(src => {
     const bad = [], val = eval(src), types = new Set();
     let same = 0;
@@ -3104,7 +3158,7 @@ const fakeSpeech = () => {
   ok(e1.length === 0, 'Year 3: True or false (< > to 1,000, + − × ÷ with the 2, 3, 4, 5, 8, 10 tables), More or less (to 1,000, table facts, hundreds and tens), Balance (to 1,000, all four signs), Rounding (nearest 10 or 100) ' + e1.join(' | '));
   ok(await page.evaluate(() => [ACTS.cmp.key({ yr: 3, kinds: ['dots', 'num', 'sum', 'dec', 'frac'], n: 12 }), ACTS.cmp.key({ yr: 3, kinds: ['frac'], n: 6 }), ACTS.round.key({ yr: 3, kinds: ['line', 'num'], n: 12 }),
     labelFor('cmp~3|num,sum|12'), labelFor('tf~3|12'), labelFor('bal~3|6'), labelFor('round~3|line|6'), ['tf', 'cmp', 'bal', 'round'].map(a => yearsOf(a).join('')).join(' ')].join(' / '))
-    === 'cmp~3|num,sum,frac|12 / cmp~3|frac|6 / round~3|line,num|12 / More or less · Year 3 · numbers, sums · 12 questions / True or false · Year 3 · 12 questions / Balance · Year 3 · 6 questions / Rounding · Year 3 · number line · 6 questions / 12345 12345 12345 2345','Year 3 record keys and labels; the Year rows');
+    === 'cmp~3|num,sum,frac|12 / cmp~3|frac|6 / round~3|line,num|12 / More or less · Year 3 · numbers, sums · 12 questions / True or false · Year 3 · 12 questions / Balance · Year 3 · 6 questions / Rounding · Year 3 · number line · 6 questions / 123456 12345 12345 2345','Year 3 record keys and labels; the Year rows (True or false has Year 6 since F1a)');
   await page.evaluate(() => { setYear(3); hideDone(); });
   for (const [a, c] of [['tf', { yr: 3, n: 12 }], ['cmp', { yr: 3, kinds: ['num', 'sum'], n: 12 }], ['bal', { yr: 3, n: 12 }], ['round', { yr: 3, kinds: ['line', 'num'], n: 12 }], ['tf', { yr: 3, n: 6 }], ['round', { yr: 3, kinds: ['line'], n: 6 }]]) {
     await page.evaluate((a, c) => { hideDone(); act = a; buildSheet(c); show('sheet'); }, a, c);
@@ -3713,7 +3767,8 @@ const fakeSpeech = () => {
       ['cmp', { yr: 3, kinds: ['frac'], n: 12 }], ['frac', { kinds: ['add1'], parts: [2, 3, 4, 6, 8, 10, 12], n: 12 }], ['fof', { yr: 3, kinds: ['part', 'whole'], n: 12 }],
       ['money', { yr: 3, kinds: ['make'], n: 12 }], ['clock', { yr: 3, kinds: ['match'], n: 12 }], ['clock', { yr: 3, kinds: ['ampm'], n: 12 }],
       ['ruler', { yr: 3, kinds: ['scales'], n: 12 }], ['ruler', { yr: 3, kinds: ['jug'], n: 12 }], ['graph', { yr: 3, n: 12 }], ['mirror', { yr: 3, n: 6 }],
-      ['map', { yr: 3, kinds: ['tap'], n: 6 }], ['shape', { yr: 3, kinds: ['name'], n: 12 }]]) {
+      ['map', { yr: 3, kinds: ['tap'], n: 6 }], ['shape', { yr: 3, kinds: ['name'], n: 12 }],
+      ['order', { yr: 6, n: 12 }], ['tf', { yr: 6, n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));
