@@ -16,7 +16,7 @@ IB definition questions are worth 2 marks. Examiner reports repeat that one-line
 - `test/run.sh` + `test/tests.js`: headless Chrome tests (puppeteer-core shared with ShiftWork in `~/.cache/sw-test`). `DD_SHOTS=<dir>` saves screenshots.
 - `IB BM Glossary (IBO).pdf` and `IB BM Kognity definitions_glossary.md`: **copyrighted, never commit** (in `.git/info/exclude`).
 
-Rebuild after any change: `node definitions/import.mjs && node definitions/build.mjs`, then `bash definitions/test/run.sh` (102 checks; run twice, since term choice is random).
+Rebuild after any change: `node definitions/import.mjs && node definitions/build.mjs`, then `bash definitions/test/run.sh` (125 checks; run twice, since term choice is random).
 
 ## Data
 
@@ -39,9 +39,12 @@ Each entry in `data/*.json`: `term`, `unit`, `topic` ("5.5 Break-even analysis",
 
 ## Per-student memory (browser only, per subject)
 
-Kept in localStorage, keys `dd-again-<slug>` and `dd-seen-<slug>`, term key `unit|term`. Only `loadSet` / `saveSet` touch storage (wrapped in try/catch), so a Google sign-in can replace them later (Sam may add one).
+Kept in localStorage, keys `dd-again-<slug>`, `dd-seen-<slug>` and `dd-last-<slug>`, term key `unit|term`. Only `loadSet` / `saveSet` / `loadObj` / `saveObj` touch storage (wrapped in try/catch). **Browser only by Sam's decision (2026-11-19): it fits his school's data protection policy. Do not add a login or a server store.**
 
-- **Review again (Sam, 2026-11-18):** each term card and each "To go over" entry has a "☆ Review again" toggle, off by default. Once anything is saved, the start page shows a "Review again" section above Topics: "Whole course" plus one button per unit (deliberately no subtopics), and a "List" fold with each saved term, its definition and its toggle. These buttons add to picks like unit buttons, so they mix with other topics.
+- **Review again (Sam, 2026-11-18):** each term card, each "To go over" entry and each glossary definition has a "☆ Review again" toggle, off by default. Once anything is saved, the start page shows a "Review again" section above Topics: "Whole course" plus one button per unit (deliberately no subtopics), and "List →", which opens the Glossary filtered to ★ Review again. These buttons add to picks like unit buttons, so they mix with other topics.
+- **Progress, last result (Sam, 2026-11-19):** `dd-last` holds each term's result the last time it was on a checked board (fillers too): 1 right, 0 missed. Last result, not "ever right", so a later miss turns it amber again. **No numbers on screen** (Sam's wish): each subtopic button has a thin strip along its bottom edge with one segment per term, sorted right (subject colour), missed (amber), not yet (pale); each unit heading has one continuous bar in the same colours. Counts are only in `aria-label`s for screen readers.
+- **Glossary (Sam, 2026-11-19):** a "Practise | Glossary" switch above the start page (`#tabs`, hidden during play). Units with their bar, subtopics as `<details>` folds with their strip, each term a fold with a progress dot, its definition (amber split bars) and its Review again toggle. Filters, single choice, tap again for all: Not yet, Missed, Right, ★ Review again; a filter opens every subtopic that has a match. "Clear my progress" at the bottom clears `again`, `seen` and `last` for this subject: the first tap turns it into "Keep my progress" and the real confirm appears at the top of the glossary, ignoring taps for 0.5 s (Sam's double-click-proof pattern).
+- **Report a definition (Sam, 2026-11-19):** a deliberately small, quiet link under the three terms on each board. It opens a panel: pick which term, optional note, "Send to Sam". POSTs to the shared feedback Worker (`app: 'definitions'`, type bug, message "<Subject> definition: <term> (<topic>)" plus the note, `diagram` = JSON of subject, term, unit, topic, parts). Nothing else about the student is sent.
 - **No repeats until all asked (Sam, 2026-11-18):** every term on a checked board (fillers too) is recorded as asked. Start uses `choose()`: never-asked terms from the pick first; when fewer are left than the round needs, it takes them all, clears the asked marks for that pick (a fresh cycle) and fills from the rest. The start line adds "· N not asked yet" or "· all asked, starting again" (nothing when none of the pick has been asked). Retry missed is unaffected.
 
 ## Links
@@ -50,7 +53,6 @@ Homepage: Business menu and BM panel link `/definitions/business/`; Economics me
 
 ## Possible later (only if Sam asks)
 
-- Google sign-in so Review again and asked terms follow students across devices.
 - Easier warm-up mode: plain term-to-definition matching.
 - Teacher print view of all definitions for a topic.
 

@@ -255,6 +255,47 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   await pick27();
   ok(await text(page, '#fresh') === '· 9 not asked yet', 'asked terms are remembered after a reload');
 
+  // ---- progress bars (last result per term, no numbers) and the glossary ----
+  const strip27 = () => page.evaluate(() => {
+    const s = [...document.querySelectorAll('.chip.sub')].find(c => c.textContent.startsWith('2.7')).querySelector('.strip');
+    return [...s.children].map(i => i.className).join('');
+  });
+  ok(await strip27() === 'r'.repeat(15), '2.7 strip: 15 segments, all right after three clean rounds');
+  ok(await page.$eval('.unit[data-u="2"] .ubar', b => b.children.length === 1 && Math.abs(parseFloat(b.firstChild.style.width) - 15 / 105 * 100) < 0.01), 'HR unit bar filled 15/105');
+  ok(await page.$eval('.unit[data-u="3"] .ubar', b => b.children.length === 0), 'untouched unit bar is empty');
+  ok(await page.$$eval('.strip, .ubar', l => l.every(s => !s.textContent)), 'bars carry no numbers');
+  await page.click('#start');
+  { const k1 = await key(page); await solveByTap(page, swapFirst(k1)); }
+  const missedTerm = await page.evaluate(() => state.boards[0][0].d.term);
+  await page.click('#check'); await page.click('#next');
+  await solveByTap(page, await key(page)); await page.click('#check'); await page.click('#next');
+  await page.click('#change');
+  ok(await strip27() === 'r'.repeat(14) + 'm', 'a missed term turns amber (last result counts)');
+  await page.click('#tabs [data-v="gloss"]');
+  ok(await page.$eval('#setup', e => e.hidden) && await page.$eval('#gloss', e => !e.hidden), 'Glossary tab swaps the view');
+  ok(await page.$$eval('#gunits .gunit', l => l.length) === 6 && await page.$$eval('#gunits .gterm', l => l.length) === 486, 'glossary lists all 486 terms in 6 units');
+  await page.click('#filters [data-f="m"]');
+  ok(await page.$$eval('#gunits .gterm', (l, t) => l.length === 1 && l[0].querySelector('summary').textContent.startsWith(t), missedTerm), 'Missed shows only the missed term');
+  await page.click('#gunits .gterm summary');
+  ok(await page.$eval('#gunits .gdef', e => e.offsetHeight > 0 && e.querySelector('.again')), 'tapping a term opens its definition');
+  await page.click('#filters [data-f="r"]');
+  ok(await page.$$eval('#gunits .gterm', l => l.length) === 14 && await page.$$eval('#gunits .gterm .dot.r', l => l.length) === 14, 'Right shows the 14');
+  await page.click('#filters [data-f="r"]');
+  ok(await page.$$eval('#gunits .gterm', l => l.length) === 486, 'tapping the filter again shows all');
+  ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll on glossary (phone)');
+  await shot(page, 'glossary-phone');
+  // clear progress: first tap becomes Keep, the confirm sits at the top and ignores a quick second tap
+  await page.click('#clearBtn');
+  ok(await text(page, '#clearBtn') === 'Keep my progress' && await page.$eval('#clearConfirm', e => !e.hidden), 'Clear asks for a confirm at the top');
+  await page.click('#clearYes');
+  ok(await page.evaluate(() => Object.keys(last).length) === 15, 'a too-quick confirm does nothing');
+  await page.click('#clearBtn');
+  ok(await page.$eval('#clearConfirm', e => e.hidden), 'Keep my progress cancels');
+  await page.click('#clearBtn'); await new Promise(r => setTimeout(r, 600)); await page.click('#clearYes');
+  ok(await page.evaluate(() => Object.keys(last).length === 0 && !localStorage.getItem('dd-last-business') && !localStorage.getItem('dd-seen-business')), 'confirm clears the progress');
+  await page.click('#tabs [data-v="setup"]');
+  ok(await strip27() === 'n'.repeat(15) && await text(page, '#fresh') === '', 'bars and asked marks are back to empty');
+
   // ---- landing page ----
   await page.goto(process.env.DD_ROOT, { waitUntil: 'networkidle0' });
   ok(JSON.stringify(await page.$$eval('a.subj', l => l.map(a => a.getAttribute('href')))) === '["business/","economics/"]', 'landing links to both subjects');
@@ -330,9 +371,32 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   ok(await page.$$eval('#missed li .again', l => l.length) === await page.$$eval('#missed li', l => l.length), 'To go over list has Review again buttons');
   await page.click('#change');
   await page.click('#againChips .fold');
-  ok(await page.$$eval('#againList li', l => l.length) === 2, 'List shows the saved terms');
-  await page.click('#againList li:first-child .again');
-  ok(await page.$$eval('#againChips .chip', l => l[0].textContent) === 'Whole course1' && await page.$eval('#againList', e => !e.hidden), 'unmarking in the list updates the counts, list stays open');
+  ok(await page.$eval('#gloss', e => !e.hidden) && await pressed('#filters [data-f="a"]'), 'List opens the glossary filtered to Review again');
+  ok(await page.$$eval('#gunits .gterm', l => l.length) === 2, 'glossary lists the 2 saved terms');
+  await page.click('#gunits .gterm summary');
+  await page.click('#gunits .gterm .again');
+  await page.click('#tabs [data-v="setup"]');
+  ok(await page.$$eval('#againChips .chip', l => l[0].textContent) === 'Whole course1', 'unmarking in the glossary updates the Review again counts');
+
+  // ---- report a definition (economics) ----
+  await page.evaluate(() => { window._sent = []; window.fetch = async (u, o) => { _sent.push({ u, body: JSON.parse(o.body) }); return { ok: true, status: 200 }; }; });
+  await page.evaluate(() => { state.picks.clear(); syncSetup(); });
+  await page.click('#againChips .chip:nth-child(1)');
+  await page.click('#start');
+  ok(await page.$eval('#play', e => !e.hidden) && await page.$eval('#rpanel', e => e.hidden) && await text(page, '#rlink') === 'Report a definition', 'report link under the terms, panel closed');
+  await page.click('#rlink');
+  ok(await page.$$eval('#rpanel [data-rt]', l => l.length) === 3 && await page.$eval('#rsend', b => b.disabled), 'panel offers the 3 terms, Send waits for a pick');
+  const rterm = await page.$eval('#rpanel [data-rt="1"]', b => b.textContent);
+  await page.click('#rpanel [data-rt="1"]');
+  await page.type('#rnote', 'second part looks off');
+  await page.click('#rsend');
+  await new Promise(r => setTimeout(r, 50));
+  const sent = await page.evaluate(() => _sent);
+  ok(sent.length === 1 && sent[0].u === 'https://unisam.nz/feedback/api/report' && sent[0].body.app === 'definitions' &&
+    sent[0].body.message.startsWith(`Economics definition: ${rterm} (`) && sent[0].body.message.endsWith('second part looks off') &&
+    JSON.parse(sent[0].body.diagram).term === rterm, 'report sends the chosen term and note to the feedback inbox');
+  ok(await page.$eval('#rpanel', e => e.hidden) && (await text(page, '#rlink')).startsWith('Thanks, sent'), 'report says thanks');
+  ok(await page.evaluate(() => Object.keys(state.placed).length === 0 && state.sel === null), 'reporting does not touch the pieces');
   await page.goto(URL, { waitUntil: 'networkidle0' });
   ok(await page.$eval('#againBlock', e => e.hidden), 'Business keeps its own list');
 
