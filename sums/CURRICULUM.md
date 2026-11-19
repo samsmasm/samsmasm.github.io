@@ -326,21 +326,21 @@ Year 5 buttons so far (C1, C2a, C2b, C3a, C3b, C3c, 2026-11-17): Add and take aw
 
 ## Year 6
 
-Year 6 buttons so far (F1a, 2026-11-19): Order (new), True or false.
+Year 6 buttons so far (F1a, F1b, 2026-11-19): Order (new), True or false, Times and divide, Story sums; and Times bonds' Kind Squares and cubes (Times bonds has no Year row).
 
 ### Number
 - Read, write, compare and order any whole number.
 - Factor pairs of any product up to 12 × 12.
 - Round to the nearest 10 up to the nearest million; round hundredths to the nearest whole or tenth.
-- Square and cube numbers and the ² and ³ signs. Knows: squares to 144, cubes to 125. ✓ partly (Order, Year 6: squares inside sums, 5 + 3², (4 + 8)²; not cubes; F1a)
+- Square and cube numbers and the ² and ³ signs. Knows: squares to 144, cubes to 125. ✓ (Order, Year 6: squares inside sums, 5 + 3², (4 + 8)², F1a; Times bonds, Kind Squares and cubes: 7² = ___, ☐² = 49, 3³ = ___, F1b)
 - Count forwards and backwards with negative numbers (from −6, back in 2s).
 
 ### Operations
 - Order of operations: brackets, then squaring, then × and ÷ left to right, then + and − left to right. ✓ (Order, Year 6: pairs of sums that differ only in their brackets, 3 + 4 × 2 and (3 + 4) × 2, 10 − 4 + 3 and 10 − (4 + 3); F1a)
 - Add and subtract any whole numbers.
-- Multiply any whole number by a two-digit number (542 × 12).
-- Divide up to a five-digit number by one digit, with a remainder (1283 ÷ 5 = 256 remainder 3).
-- Write the remainder as a whole number, a fraction or a rounded decimal, whichever suits the story (⅙ of 31 = 31 ÷ 6 = 5⅙).
+- Multiply any whole number by a two-digit number (542 × 12). ✓ (Times and divide, Year 6: three or four digits × two digits, stacked; F1b)
+- Divide up to a five-digit number by one digit, with a remainder (1283 ÷ 5 = 256 remainder 3). ✓ (Times and divide, Year 6: five digits ÷ one digit in the long-division bracket, "__ r __"; F1b)
+- Write the remainder as a whole number, a fraction or a rounded decimal, whichever suits the story (⅙ of 31 = 31 ÷ 6 = 5⅙). ✓ partly (Story sums, Year 6: the story decides, round up for vans or trips, round down for full boxes, or what is left over; whole numbers only, no fraction or decimal remainders; F1b)
 
 ### Fractions, decimals, percentages and money
 - Tenths, hundredths and thousandths; compare and order numbers to three decimal places.

@@ -168,7 +168,7 @@ const fakeSpeech = () => {
   await page.click('#yearTiles [data-year="8"]');
   ok(await page.evaluate(() => view === 6 && /highest so far/.test($('#yMine').textContent) && $('#yMine').textContent.includes('Year 8')), 'Year 8: the Year 6 page, marked the highest so far');
   const p6 = await tiles('#actTiles');
-  ok(p6.includes('Order') && p6.includes('True or false') && p6.includes('Sums') && p6.includes('Arrays') && !p6.includes('Add and take away') && !p6.includes('Chance'), 'Year 6 page: Order, True or false and the older tiles without years ' + p6.join(', '));
+  ok(p6.includes('Order') && p6.includes('True or false') && p6.includes('Times and divide') && p6.includes('Story sums') && p6.includes('Sums') && p6.includes('Arrays') && !p6.includes('Add and take away') && !p6.includes('Chance'), 'Year 6 page: Order, True or false, Times and divide, Story sums and the older tiles without years (F1b) ' + p6.join(', '));
   await page.evaluate(() => turnPage(-1));
   const y5 = await tiles('#actTiles');
   ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums', 'Decimals', 'Money', 'Clocks', 'Change units', 'Angles', 'Map', 'Shapes', 'Graphs'].every(t => y5.includes(t)) && !y5.includes('Rulers'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
@@ -600,6 +600,42 @@ const fakeSpeech = () => {
   ok((await fits()).length === 0, 'Times bonds fit ' + (await fits()).join(' '));
   ok((await writeAllAndMark()).length === 0, 'Times bonds: answers in the empty circle read and marked right');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/16-tbond.png' });
+  // F1b: Kind Squares and cubes (Year 6): 7² = ___, ☐² = 49, 3³ = ___
+  const sqs = await page.evaluate(() => {
+    const bad = [], fs = new Set();
+    for (let i = 0; i < 600; i++) {
+      const q = sqQ(); fs.add(q.sq);
+      if (q.sq === 'sq') { const n = +q.text.slice(0, -1); if (q.kind !== 'expr' || q.text !== `${n}²` || q.ans !== n * n || n < 2 || q.ans > 144 || q.say !== `${n} squared`) bad.push(JSON.stringify(q)); }
+      else if (q.sq === 'cube') { const n = +q.text.slice(0, -1); if (q.kind !== 'expr' || q.text !== `${n}³` || q.ans !== n ** 3 || n < 2 || q.ans > 125 || q.say !== `${n} cubed`) bad.push(JSON.stringify(q)); }
+      else { const v = +q.text.split(' = ')[1]; if (q.kind !== 'bal' || q.text !== `☐² = ${v}` || q.ans * q.ans !== v || q.ans < 2 || q.ans > 12 || cardSay(q) !== `What squared is ${v}?`) bad.push(JSON.stringify(q)); }
+    }
+    if (fs.size !== 3) bad.push('forms ' + [...fs]);
+    const both = range(0, 300).map(() => ACTS.tbond.make({ tables: [7], upto: 10, kinds: ['bonds', 'sq'], n: 12 }));
+    if (!both.some(q => q.kind === 'bond') || !both.some(q => q.sq)) bad.push('both kinds should mix');
+    if (range(0, 100).some(() => ACTS.tbond.make({ tables: [7], upto: 10, kinds: ['bonds'], n: 12 }).sq) || range(0, 100).some(() => !ACTS.tbond.make({ tables: [7], upto: 10, kinds: ['sq'], n: 12 }).sq)) bad.push('a kind that is off');
+    return bad.slice(0, 4);
+  });
+  ok(sqs.length === 0, 'Squares and cubes: 7² (squares 4 to 144), ☐² = 49, 3³ (cubes 8 to 125), spoken "squared", "cubed"; mixes with Times bonds ' + sqs.join(' | '));
+  await page.click('#setupBtn');
+  ok(await page.evaluate(() => draft.kinds.join() === 'bonds'), 'Times bonds: Kind defaults to Times bonds only');
+  await page.click('#optBlock [data-key="kinds"] [data-v="sq"]');
+  await page.click('#optBlock [data-key="kinds"] [data-v="bonds"]');
+  for (const n of [12, 6]) {
+    await page.click(`#nOpts [data-v="${n}"]`).catch(() => {});
+    await page.click('#newBtn');
+    ok(await page.evaluate(() => cards.every(c => c.q.sq && (c.q.kind === 'bal' ? c.el.querySelectorAll('.eq .bx').length === 1 : !!c.el.querySelector('.wl')))), `Squares and cubes sheet (${n}): powers and ☐² cards only`);
+    ok((await fits()).length === 0, `Squares and cubes fit (${n}) ` + (await fits()).join(' '));
+    ok((await writeAllAndMark()).length === 0, `Squares and cubes (${n}): answers read and marked right`);
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/16-tbond-sq-${n}.png` });
+    await page.click('#setupBtn');
+  }
+  ok(await page.evaluate(() => [ACTS.tbond.key({ tables: [7], upto: 10, kinds: ['bonds'], n: 12 }), ACTS.tbond.key({ tables: [7], upto: 10, kinds: ['sq', 'bonds'], n: 6 }), ACTS.tbond.key({ tables: [7], upto: 10, n: 6 }),
+    labelFor('tbond~7|10|6|bonds,sq'), labelFor('tbond~7|10|6|sq'), labelFor('tbond~7|10|12')].join(' / '))
+    === 'tbond~7|10|12 / tbond~7|10|6|bonds,sq / tbond~7|10|6 / Times bonds · 7 · up to × 10 · squares and cubes · 6 questions / Times bonds · squares and cubes · 6 questions / Times bonds · 7 · up to × 10 · 12 questions',
+    'Times bonds record keys (Times bonds alone keeps the old key) and labels');
+  await page.click('#optBlock [data-key="kinds"] [data-v="bonds"]');
+  await page.click('#optBlock [data-key="kinds"] [data-v="sq"]');
+  await page.click('#newBtn');
 
   // ---- Mia: Fractions
   await page.click('#backBtn');
@@ -982,6 +1018,30 @@ const fakeSpeech = () => {
   ok((await writeAllAndMark()).length === 0, 'Times and divide Year 1: answers written under the bags are read and marked right');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/25-muldiv-y1.png' });
   ok(await page.evaluate(() => { const q = addSubQ('+', 1); return cardSay(q) === q.text.replace('+', 'plus'); }), 'Year 1 sums are read aloud ("3 plus 4")');
+  // F1b: Times and divide Year 6: any number × two digits stacked; five digits ÷ one digit with a remainder
+  const y6q = await page.evaluate(() => {
+    const bad = [], seen = new Set();
+    for (let i = 0; i < 600; i++) {
+      const m = mulDivQ('*', 6);
+      seen.add('x' + String(m.a).length);
+      if (m.kind !== 'col' || m.op !== '*' || m.ans !== m.a * m.b || m.a < 101 || m.a > 9999 || m.b < 11 || m.b > 99) bad.push('times ' + JSON.stringify(m));
+      const d = mulDivQ('/', 6), [k, r] = d.parts;
+      seen.add(r ? 'rem' : 'exact');
+      if (d.kind !== 'div' || !d.rem || !d.two || d.a !== d.b * k + r || r < 0 || r >= d.b || d.b < 2 || d.b > 9 || d.a < 10000 || d.a > 99999 || d.ans !== `${k} r ${r}`) bad.push('divide ' + JSON.stringify(d));
+    }
+    if (!['x3', 'x4', 'rem', 'exact'].every(s => seen.has(s))) bad.push('seen ' + [...seen]);
+    return bad.slice(0, 4);
+  });
+  ok(y6q.length === 0, 'Times and divide Year 6: 3 and 4 digits × 2 digits stacked, five digits ÷ one digit with a remainder (some exact) ' + y6q.join(' | '));
+  await yearSheet('muldiv', 6, 'Times and divide');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/25-muldiv-y6.png' });
+  for (const ops of [['*'], ['/']]) {
+    await page.evaluate(ops => { hideDone(); buildSheet({ yr: 6, ops, n: 12 }); }, ops);
+    ok((await fits()).length === 0, `Times and divide Year 6 ${ops} (12) fits ` + (await fits()).join(' '));
+    ok((await writeAllAndMark()).length === 0, `Times and divide Year 6 ${ops}: read and marked right`);
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/25-muldiv-y6-${ops[0] === '*' ? 'times' : 'rem'}.png` });
+  }
+  ok(await page.evaluate(() => labelFor('muldiv~6|*/|12') === 'Times and divide · Year 6 · × ÷ · 12 questions' && ACTS.muldiv.key({ yr: 6, ops: ['/', '*'], n: 6 }) === 'muldiv~6|*/|6'), 'Times and divide Year 6 record key and label');
 
   // ---- Number patterns
   const sq = await page.evaluate(() => {
@@ -1080,6 +1140,41 @@ const fakeSpeech = () => {
   ok((await fits()).length === 0, 'Story sums Year 4: the longest recipe story fits ' + (await fits()).join(' '));
   ok((await writeAllAndMark()).length === 0, 'Story sums Year 4 recipes: read and marked right');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/28-story-y4.png' });
+  // F1b: Story sums Year 6: remainder stories where the story decides (round up, round down, what is left); + − as Year 4
+  const st6 = await page.evaluate(() => {
+    const bad = [], types = new Set(), units = new Set();
+    const calc = { add: n => n[0] + n[1], sub: n => n[0] - n[1], compare: n => n[0] - n[1], need: n => n[1] - n[0], two: n => n[0] + n[1] - n[2], up: n => Math.ceil(n[0] / n[1]), down: n => Math.floor(n[0] / n[1]), left: n => n[0] % n[1] };
+    for (const kinds of [['addsub', 'muldiv'], ['muldiv'], ['addsub']]) for (let i = 0; i < 300; i++) {
+      const q = storyQ(6, kinds), n = q.text.match(/\d+/g).map(Number);
+      types.add(q.type);
+      if (!calc[q.type] || q.ans !== calc[q.type](n) || q.ans < 2 || Math.max(...n, q.ans) > 10000 || q.say !== q.text) bad.push(JSON.stringify(q));
+      if (!kinds.includes(STORY_KIND[q.type])) bad.push(`type ${q.type} ${kinds}`);
+      if (STORY_KIND[q.type] === 'muldiv') {
+        units.add(q.unit);
+        if (n.length !== 2 || n[0] % n[1] === 0 || n[1] < 3 || n[1] > 12) bad.push('remainder ' + q.text);
+        if (q.type === 'up' && !/need|trips|all of them/.test(q.text)) bad.push('up wording ' + q.text);
+      }
+    }
+    if (!['up', 'down', 'left', 'add', 'two'].every(t => types.has(t))) bad.push('types ' + [...types]);
+    if (!['vans', 'trips', 'bows', 'tickets', 'boxes'].every(u => units.has(u))) bad.push('units ' + [...units]);
+    return bad.slice(0, 4);
+  });
+  ok(st6.length === 0, 'Story sums Year 6: remainder stories that round up (vans), round down (full boxes) or ask what is left, never exact; + − as Year 4 ' + st6.join(' | '));
+  await page.evaluate(() => { hideDone(); buildSheet({ yr: 6, kinds: ['muldiv'], n: 6 }); });
+  ok(await page.evaluate(() => cards.every(c => ['up', 'down', 'left'].includes(c.q.type) && cardSay(c.q) === c.q.text && c.el.querySelector('.u').textContent === c.q.unit)), 'Story sums Year 6 × ÷ sheet: remainder stories, read aloud, unit after the line');
+  ok((await fits()).length === 0, 'Story sums Year 6 fits ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Story sums Year 6: read and marked right');
+  // the longest remainder story on every card
+  await page.evaluate(() => {
+    hideDone(); buildSheet({ yr: 6, kinds: ['muldiv'], n: 6 });
+    const text = 'A squirrel has 311 bananas. A box holds 12. How many boxes does it need for all of them?';
+    const t2 = '311 people want to cross a river. A boat holds 12 people. How many trips does the boat make?';
+    cards.forEach((c, i) => { const tx = i % 2 ? text : t2; c.q = { kind: 'story', type: 'up', text: tx, unit: i % 2 ? 'boxes' : 'trips', say: tx, ans: 26 }; layout(c); sizeCanvas(c); });
+  });
+  ok((await fits()).length === 0, 'Story sums Year 6: the longest remainder stories fit ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/28-story-y6.png' });
+  await yearSheet('story', 6, 'Story sums');
+  ok(await page.evaluate(() => labelFor('story~6|addsub,muldiv|6') === 'Story sums · Year 6 · + −, × ÷ · 6 questions' && yearsOf('story').join() === '1,2,3,4,6' && yearsOf('muldiv').join() === '1,2,3,4,5,6'), 'Story sums Year 6 label; Story sums Years 1–4 and 6, Times and divide Years 1–6');
 
   // ---- Graphs
   const gq = await page.evaluate(() => {
@@ -3768,13 +3863,14 @@ const fakeSpeech = () => {
       ['money', { yr: 3, kinds: ['make'], n: 12 }], ['clock', { yr: 3, kinds: ['match'], n: 12 }], ['clock', { yr: 3, kinds: ['ampm'], n: 12 }],
       ['ruler', { yr: 3, kinds: ['scales'], n: 12 }], ['ruler', { yr: 3, kinds: ['jug'], n: 12 }], ['graph', { yr: 3, n: 12 }], ['mirror', { yr: 3, n: 6 }],
       ['map', { yr: 3, kinds: ['tap'], n: 6 }], ['shape', { yr: 3, kinds: ['name'], n: 12 }],
-      ['order', { yr: 6, n: 12 }], ['tf', { yr: 6, n: 12 }]]) {
+      ['order', { yr: 6, n: 12 }], ['tf', { yr: 6, n: 12 }],
+      ['muldiv', { yr: 6, ops: ['*'], n: 12 }], ['muldiv', { yr: 6, ops: ['/'], n: 12 }], ['tbond', { tables: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], upto: 12, kinds: ['sq'], n: 12 }], ['story', { yr: 6, kinds: ['muldiv'], n: 6 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));
       const wrong = await writeAllAndMark();
       ok(wrong.length === 0, `${name}: ${a} read and marked right ` + wrong.join(' | '));
-      if (SHOTS) await page.screenshot({ path: SHOTS + `/40-${name}-${a}${c.yr || ''}${(c.kinds || []).join('')}.png` });
+      if (SHOTS) await page.screenshot({ path: SHOTS + `/40-${name}-${a}${c.yr || ''}${(c.kinds || []).join('')}${(c.ops || []).map(o => ({ '+': 'p', '-': 'm', '*': 'x', '/': 'd' })[o]).join('')}.png` });
     }
   }
 

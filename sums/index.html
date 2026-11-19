@@ -1349,11 +1349,22 @@ function hundredthsQ(op) {
 // remainder, answered "__ r __" above the bar; about one in four comes out exact
 // (she writes 0 after the r, or leaves it empty). Tables facts to 12, or up to
 // four digits divided by one digit.
-function remQ() {
-  const tbl = Math.random() < 0.35;
-  const d = tbl ? rnd(3, 12) : rnd(2, 9), k = tbl ? rnd(2, 12) : rnd(11, Math.floor(9999 / d) - 1);
+// Year 6 (big): always five digits divided by one digit (10000 to 99999).
+function remQ(big) {
+  const tbl = !big && Math.random() < 0.35;
+  const d = tbl ? rnd(3, 12) : rnd(2, 9);
+  const k = tbl ? rnd(2, 12) : big ? rnd(Math.ceil(10000 / d), Math.floor((99999 - d + 1) / d)) : rnd(11, Math.floor(9999 / d) - 1);
   const r = Math.random() < 0.25 ? 0 : rnd(1, d - 1), a = d * k + r;
   return { kind: 'div', a, b: d, op: '/', two: true, rem: true, parts: [k, r], ans: `${k} r ${r}` };
+}
+// Times bonds, Squares and cubes (Year 6): 7² = ___ (squares to 144), ☐² = 49,
+// 3³ = ___ (cubes to 125). 1 is left out (1² and 1³ teach nothing).
+function sqQ() {
+  const f = pickOne(['sq', 'sq', 'root', 'root', 'cube']);
+  if (f === 'cube') { const n = rnd(2, 5); return { kind: 'expr', sq: f, text: `${n}³`, say: `${n} cubed`, ans: n ** 3 }; }
+  const n = rnd(2, 12);
+  return f === 'sq' ? { kind: 'expr', sq: f, text: `${n}²`, say: `${n} squared`, ans: n * n }
+    : { kind: 'bal', sq: f, text: `☐² = ${n * n}`, say: `What squared is ${n * n}?`, ans: n };
 }
 // Year 1 has no × or ÷ signs (those come in Year 2): pictures instead.
 // Groups: g bags of k dots, how many altogether? Sharing: g·k dots shared
@@ -1390,6 +1401,8 @@ function groupsSvg(q) {
 }
 function mulDivQ(op, yr) {
   if (yr === 1) return groupsQ(op);
+  // Year 6: any number × a two-digit number (542 × 12, stacked), five digits ÷ one digit with a remainder
+  if (yr === 6) return op === '/' ? remQ(true) : asQ('*', Math.random() < 0.6 ? rnd(101, 999) : rnd(1001, 9999), rnd(11, 99), yr);
   if (yr === 5) { // tables to 12, four digits × one digit, two digits × two digits (stacked, room for two working rows); ÷ with remainders
     if (op === '/') return remQ();
     const k = pickOne(['table', 'big', 'two']);
@@ -1489,16 +1502,41 @@ function dblQ(yr, kinds) {
 // ---- story sums: short word problems about animals, read aloud at age 5
 const CRITTERS = [['Ty the cat', 'cats', 'fish', 'eats'], ['A dog', 'dogs', 'bones', 'buries'], ['A bird', 'birds', 'seeds', 'eats'], ['A frog', 'frogs', 'flies', 'eats'],
   ['A squirrel', 'squirrels', 'nuts', 'hides'], ['A rabbit', 'rabbits', 'carrots', 'eats'], ['A monkey', 'monkeys', 'bananas', 'eats'], ['A hen', 'hens', 'eggs', 'gives away']];
-const STORY_KIND = { add: 'addsub', sub: 'addsub', compare: 'addsub', need: 'addsub', two: 'addsub', groups: 'muldiv', share: 'muldiv', recipe: 'muldiv', scale: 'muldiv' };
+const STORY_KIND = { add: 'addsub', sub: 'addsub', compare: 'addsub', need: 'addsub', two: 'addsub', groups: 'muldiv', share: 'muldiv', recipe: 'muldiv', scale: 'muldiv', up: 'muldiv', down: 'muldiv', left: 'muldiv' };
+// Year 6 remainder stories, where the story decides what to do with the remainder:
+// up (everyone must fit: one more), down (only full ones count), left (the remainder itself).
+// Each is (S, things, n, k) => [text, unit]; n always comes before k in the words.
+const REM_STORIES = {
+  up: [
+    (S, th, n, k) => [`${n} children are going on a trip. A van holds ${k} children. How many vans do they need?`, 'vans'],
+    (S, th, n, k) => [`${n} people want to cross a river. A boat holds ${k} people. How many trips does the boat make?`, 'trips'],
+    (S, th, n, k) => [`${S} has ${n} ${th}. A box holds ${k}. How many boxes does it need for all of them?`, 'boxes'],
+  ],
+  down: [
+    (S, th, n, k) => [`${S} has ${n} ${th}. It puts ${k} in each box. How many boxes are full?`, 'boxes'],
+    (S, th, n, k) => [`A ribbon is ${n} cm long. Each bow needs ${k} cm. How many bows can be made?`, 'bows'],
+    (S, th, n, k) => [`${S} has ${n} dollars. A ticket costs ${k} dollars. How many tickets can it buy?`, 'tickets'],
+  ],
+  left: [(S, th, n, k) => [`${S} has ${n} ${th}. It puts ${k} in each bag. How many are left over?`, th]],
+};
 // Year 4 recipe stories: [thing made (one, many), ingredient, unit]
 const BAKES = [['cake', 'cakes'], ['pizza', 'pizzas'], ['loaf of bread', 'loaves of bread']];
 const BATCHES = ['muffins', 'pancakes', 'cookies', 'biscuits'];
 const INGREDIENTS = [['flour', 'grams'], ['sugar', 'grams'], ['butter', 'grams'], ['milk', 'mL'], ['water', 'mL']];
-function storyQ(yr, kinds) {
-  const pool = (yr === 1 ? ['add', 'sub', 'groups', 'share'] : yr === 4 ? ['add', 'sub', 'compare', 'need', 'two', 'groups', 'share', 'recipe', 'scale']
+function storyQ(y, kinds) {
+  // Year 6: + − stories as Year 4 (within 10,000); × ÷ are remainder stories
+  const yr = y === 6 ? 4 : y;
+  const pool = (y === 6 ? ['add', 'sub', 'compare', 'need', 'two', 'up', 'down', 'left', 'up', 'down'] : yr === 1 ? ['add', 'sub', 'groups', 'share'] : yr === 4 ? ['add', 'sub', 'compare', 'need', 'two', 'groups', 'share', 'recipe', 'scale']
     : ['add', 'sub', 'compare', 'need', 'two', 'groups', 'share']).filter(x => kinds.includes(STORY_KIND[x]));
   for (let t = 0; t < 60; t++) {
     const [S, many, th, verb] = pickOne(CRITTERS), type = pickOne(pool);
+    if (REM_STORIES[type]) { // never comes out exact, so the story has to decide
+      const k = rnd(3, 12), q = rnd(4, 25), r = rnd(1, k - 1), n = k * q + r;
+      const [text, unit] = pickOne(REM_STORIES[type])(S, th, n, k);
+      const ans = type === 'up' ? q + 1 : type === 'down' ? q : r;
+      if (ans < 2) continue;
+      return { kind: 'story', type, text, unit, say: text, ans };
+    }
     const lo = [0, 3, 10, 100, 1000][yr], hi = [0, 20, 100, 1000, 10000][yr];
     let text, ans, a, b, c;
     if (type === 'add') { a = rnd(lo, hi - 2); b = rnd(1, Math.min(hi - a, yr === 1 ? 10 : hi)); text = `${S} has ${a} ${th}. It finds ${b} more. How many ${th} now?`; ans = a + b; }
@@ -3928,7 +3966,7 @@ const ACTS = {
     name: 'Times and divide', ages: [5, 8], setup: 'opts', say: 'Work out the answers.',
     pic: textSvg(['3 × 4', '12 ÷ 3']),
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · groups to 20'], [2, '2 · 2s, 5s, 10s'], [3, '3 · 3s, 4s, 8s too'], [4, '4 · all tables, bigger'], [5, '5 · to 12s, 2 digits × 2, remainders']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · groups to 20'], [2, '2 · 2s, 5s, 10s'], [3, '3 · 3s, 4s, 8s too'], [4, '4 · all tables, bigger'], [5, '5 · to 12s, 2 digits × 2, remainders'], [6, '6 · any × 2 digits, 5 digits ÷']] },
       { key: 'ops', label: 'Signs', multi: true, values: [['*', '×'], ['/', '÷']] },
     ],
     defaults: age => age === 5 ? { yr: 1, ops: ['*'], n: 6 } : { yr: 3, ops: ['*', '/'], n: 12 },
@@ -4103,18 +4141,25 @@ const ACTS = {
     options: [
       { key: 'tables', label: 'Times tables', multi: true, values: range(2, 12) },
       { key: 'upto', label: 'Up to', values: [[10, '× 10'], [12, '× 12']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['bonds', 'Times bonds'], ['sq', 'Squares and cubes (Year 6)']] },
     ],
-    defaults: () => ({ tables: range(2, 12), upto: 12, n: 12 }),
+    defaults: () => ({ tables: range(2, 12), upto: 12, kinds: ['bonds'], n: 12 }),
     // the product on top, the two factors below; one is empty. A missing
     // factor is a division (24 is 4 times what?).
     make: c => {
+      const kinds = c.kinds || ['bonds'];
+      if (kinds.includes('sq') && (!kinds.includes('bonds') || Math.random() < 0.5)) return sqQ();
       let p = pickOne(c.tables), q2 = rnd(2, c.upto);
       if (Math.random() < 0.5) [p, q2] = [q2, p];
       const w = p * q2, hide = pickOne(['w', 'p', 'q2']);
       return { kind: 'bond', times: true, w, p, q2, hide, ans: { w, p, q2 }[hide] };
     },
-    key: c => `tbond~${[...c.tables].sort((x, y) => x - y).join(',')}|${c.upto}|${c.n}`,
-    label: k => { const [t, u, n] = k.split('|'); return `Times bonds · ${digitsLabelNums(t.split(',').map(Number))} · up to × ${u} · ${n} questions`; },
+    // Times bonds alone keeps the old key; with Squares and cubes the kinds go on the end
+    key: c => { const ks = ['bonds', 'sq'].filter(k => (c.kinds || ['bonds']).includes(k)).join(','); return `tbond~${[...c.tables].sort((x, y) => x - y).join(',')}|${c.upto}|${c.n}${ks === 'bonds' ? '' : '|' + ks}`; },
+    label: k => {
+      const [t, u, n, ks = 'bonds'] = k.split('|');
+      return ['Times bonds', ...(ks.includes('bonds') ? [digitsLabelNums(t.split(',').map(Number)), `up to × ${u}`] : []), ...(ks.includes('sq') ? ['squares and cubes'] : []), `${n} questions`].join(' · ');
+    },
   },
   frac: {
     name: 'Fractions', ages: [8], setup: 'opts', say: 'What fraction is it?',
@@ -4247,7 +4292,7 @@ const ACTS = {
     name: 'Story sums', ages: [5, 8], setup: 'opts', say: 'Listen to the story, then write the answer.', counts: [4, 6],
     pic: `<svg viewBox="0 0 120 84" fill="currentColor">${[[20, 30], [52, 30], [84, 30], [36, 60], [68, 60]].map(([x, y]) => `<path d="M${x} ${y}q9 -9 18 0q-9 9 -18 0z M${x + 18} ${y}l8 -6v12z"/><circle cx="${x + 5}" cy="${y - 1.5}" r="1.4" fill="white"/>`).join('')}</svg>`,
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · within 20'], [2, '2 · within 100, two steps'], [3, '3 · within 1,000'], [4, '4 · within 10,000']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · within 20'], [2, '2 · within 100, two steps'], [3, '3 · within 1,000'], [4, '4 · within 10,000'], [6, '6 · remainders: round up or down']] },
       { key: 'kinds', label: 'Kind', multi: true, values: [['addsub', '+ and −'], ['muldiv', '× and ÷']] },
     ],
     defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: ['addsub', 'muldiv'], n: 6 }),
