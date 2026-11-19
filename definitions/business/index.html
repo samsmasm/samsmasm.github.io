@@ -29,7 +29,10 @@ header { background: var(--masthead); color: var(--masthead-ink); border-bottom:
 .mast { max-width: 1100px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
 .mast img { width: 48px; height: 48px; }
 .mast h1 { font-size: 1.5rem; line-height: 1.1; }
-.mast .sub { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--masthead-sub); }
+.mast a { color: inherit; text-decoration: none; }
+.mast h1 a:hover, .mast a.sub:hover { text-decoration: underline; }
+.mast img { display: block; }
+.mast .sub { display: block; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--masthead-sub); }
 .mast nav { margin-left: auto; display: flex; gap: 16px; }
 .mast nav a { color: var(--masthead-ink); font-size: 0.9rem; text-decoration: none; }
 .mast nav a:hover { text-decoration: underline; }
@@ -197,16 +200,16 @@ footer { max-width: 1100px; margin: 0 auto; padding: 16px; font-size: 0.75rem; c
 <body>
 <header>
   <div class="mast">
-    <img src="/geocorn.png" alt="">
-    <div><h1>Definition Drill</h1><div class="sub">IB Business Management</div></div>
-    <nav><a href="/definitions/">Subjects</a><a href="/">unisam.nz</a></nav>
+    <a href="/definitions/" aria-label="Definition Drill: choose a subject"><img src="/geocorn.png" alt=""></a>
+    <div><h1><a href="/definitions/">Definition Drill</a></h1><a class="sub" href="./">IB Business Management</a></div>
+    <nav><a href="/">unisam.nz</a></nav>
   </div>
 </header>
 
 <main>
   <div class="seg tabs" id="tabs"><button data-v="setup" aria-pressed="true">Practise</button><button data-v="gloss" aria-pressed="false">Glossary</button></div>
   <div id="setup">
-    <p class="lede">Three terms, eight pieces, two of them spares. Put two pieces under each term, in order.</p>
+    <p class="lede">Put two pieces under each term, in order. Two of the pieces are spares.</p>
     <section class="block" id="againBlock" hidden>
       <p class="label">Review again</p>
       <div class="againchips" id="againChips"></div>
@@ -214,6 +217,10 @@ footer { max-width: 1100px; margin: 0 auto; padding: 16px; font-size: 0.75rem; c
     <section class="block">
       <p class="label">Topics</p>
       <div id="units"></div>
+    </section>
+    <section class="block">
+      <p class="label">Each board</p>
+      <div class="seg" id="sizes"></div>
     </section>
     <section class="block">
       <p class="label">How many terms</p>
@@ -267,9 +274,11 @@ const DEFS = [{"term":"Business","unit":1,"topic":"1.1 What is a business?","hl"
 
 const $ = id => document.getElementById(id);
 const LENGTHS = [6, 12, 18, 'All'];
-const PER_BOARD = 3;
+// terms per board: 2 (6 pieces with the spares) or 3 (8 pieces); the student's last choice is remembered for both subjects
+const SIZES = [2, 3];
+function loadPer() { try { return +localStorage.getItem('dd-board') === 2 ? 2 : 3; } catch { return 3; } }
 const state = {
-  picks: new Set(), length: 6, pool: [],
+  per: loadPer(), picks: new Set(), length: 6, pool: [],
   boards: [], b: 0, score: 0, scored: 0, missed: [],
   frags: [], placed: {}, sel: null, locked: false,
 };
@@ -404,11 +413,11 @@ $('tabs').addEventListener('click', e => { const b = e.target.closest('button[da
 
 // flagged in the bank for Sam to double-check: still played, with a small note for students
 const revTag = d => d.review ? '<span class="rev" title="This definition is still being checked, so it may change.">subject to review</span>' : '';
-// split a list of terms into boards of 3 (a leftover of 1 or 2 is spread over the last boards)
+// split a list of terms into boards of state.per (a leftover is spread over the last boards, never a board of 1)
 function chunk(list) {
-  const n = Math.max(1, Math.floor(list.length / PER_BOARD));
+  const P = state.per, n = Math.max(1, Math.floor(list.length / P));
   const out = Array.from({ length: n }, () => []);
-  list.forEach((x, i) => out[i < n * PER_BOARD ? Math.floor(i / PER_BOARD) : n - 1 - (i - n * PER_BOARD) % n].push(x));
+  list.forEach((x, i) => out[i < n * P ? Math.floor(i / P) : n - 1 - (i - n * P) % n].push(x));
   return out;
 }
 
@@ -486,6 +495,13 @@ function renderSetup() {
   if (!$('units').firstChild) buildPicker();
   renderAgain();
   syncSetup();
+  const sizes = $('sizes'); sizes.innerHTML = '';
+  for (const n of SIZES) {
+    const b = document.createElement('button'); b.textContent = `${n} terms · ${n * 2 + 2} pieces`; b.dataset.n = n;
+    b.setAttribute('aria-pressed', state.per === n);
+    b.onclick = () => { state.per = n; try { localStorage.setItem('dd-board', n); } catch {} renderSetup(); };
+    sizes.appendChild(b);
+  }
   const seg = $('lengths'); seg.innerHTML = '';
   for (const L of LENGTHS) {
     const b = document.createElement('button'); b.textContent = L;
@@ -512,13 +528,13 @@ $('start').onclick = () => {
   const items = choose(state.pool, state.length === 'All' ? state.pool.length : state.length).map(d => ({ d }));
   startRound(padBoard(items));
 };
-// a board needs 3 terms: if too few were picked, borrow unscored ones from the same unit
+// a board needs state.per terms: if too few were picked, borrow unscored ones from the same unit
 function padBoard(items) {
-  if (items.length >= PER_BOARD) return items;
+  if (items.length >= state.per) return items;
   const units = new Set(items.map(x => x.d.unit)), have = new Set(items.map(x => x.d));
   const fill = shuffle(DEFS.filter(d => !have.has(d) && units.has(d.unit)));
   const out = items.slice();
-  while (out.length < PER_BOARD && fill.length) out.push({ d: fill.pop(), extra: true });
+  while (out.length < state.per && fill.length) out.push({ d: fill.pop(), extra: true });
   return shuffle(out);
 }
 

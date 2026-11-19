@@ -296,6 +296,29 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   await page.click('#tabs [data-v="setup"]');
   ok(await strip27() === 'n'.repeat(15) && await text(page, '#fresh') === '', 'bars and asked marks are back to empty');
 
+  // ---- leaving mid-round keeps every board already checked ----
+  await page.click('#start');   // 6 terms = 2 boards
+  const done = await page.evaluate(() => state.boards[0].map(x => keyOf(x.d)));
+  await solveByTap(page, await key(page)); await page.click('#check');
+  await page.reload({ waitUntil: 'networkidle0' });
+  ok(await page.evaluate(k => Object.keys(last).length === 3 && k.every(x => last[x] === 1) && seen.size === 3, done), 'leaving after 1 of 2 boards keeps those 3 results');
+  ok(await strip27() === 'rrr' + 'n'.repeat(12), 'and the bar shows them');
+
+  // ---- board size: 2 terms (6 pieces) or 3 terms (8 pieces), remembered ----
+  ok(await pressed('#sizes [data-n="3"]') && await text(page, '#sizes [data-n="2"]') === '2 terms · 6 pieces', 'board size defaults to 3 terms; offers 2 terms · 6 pieces');
+  await page.click('#sizes [data-n="2"]');
+  await pick27(); await page.click('#start');
+  ok(await page.$$eval('#terms .term', l => l.length) === 2 && await page.$$eval('#pool .frag', l => l.length) === 6 && await text(page, '#progress') === '1 of 3', '2-term boards: 6 pieces, 6 terms = 3 boards');
+  await page.goto(URL.replace('business', 'economics'), { waitUntil: 'networkidle0' });
+  ok(await pressed('#sizes [data-n="2"]'), 'board size remembered (and shared with the other subject)');
+  await page.click('#sizes [data-n="3"]');
+  await page.goto(URL, { waitUntil: 'networkidle0' });
+  ok(await pressed('#sizes [data-n="3"]'), 'changing it back sticks');
+
+  // ---- header: logo and title go to the subject choice, the subject name back to this subject ----
+  ok(await page.$eval('.mast', m => m.querySelector('h1 a').getAttribute('href') === '/definitions/' && m.querySelector('a img').closest('a').getAttribute('href') === '/definitions/' &&
+    m.querySelector('a.sub').getAttribute('href') === './' && !m.textContent.includes('Subjects')), 'header links: logo and title to subjects, subject name to this page, no Subjects link');
+
   // ---- landing page ----
   await page.goto(process.env.DD_ROOT, { waitUntil: 'networkidle0' });
   ok(JSON.stringify(await page.$$eval('a.subj', l => l.map(a => a.getAttribute('href')))) === '["business/","economics/"]', 'landing links to both subjects');

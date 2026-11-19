@@ -8,7 +8,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const SUBJECTS = {
   business: {
     name: 'Business Management', colour: '#1a3a7a',
-    lede: 'Three terms, eight pieces, two of them spares. Put two pieces under each term, in order.',
+    lede: 'Put two pieces under each term, in order. Two of the pieces are spares.',
     minParts: 2,
     units: {
       1: 'Unit 1: Introduction to business management',
@@ -21,7 +21,7 @@ const SUBJECTS = {
   },
   economics: {
     name: 'Economics', colour: '#145c34',
-    lede: 'Three terms and their pieces, plus two spares. Put the pieces under each term, in order.',
+    lede: 'Put the pieces under each term, in order. Two of the pieces are spares.',
     minParts: 1,   // 5 terms are one idea and get a single box
     units: {
       1: 'Unit 1: Introduction to economics',
