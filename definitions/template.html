@@ -112,6 +112,7 @@ section.block { margin-bottom: 24px; }
 .frag.ok .mark { color: var(--ok); }
 .frag.bad { background: var(--bad-soft); border-color: var(--bad); }
 .frag.bad .mark { color: var(--bad); }
+.locked #pool .frag { opacity: 0.55; }
 
 /* end */
 .big { font-family: 'Fraunces', Georgia, serif; font-size: 3rem; font-weight: 700; line-height: 1; margin: 4px 0 16px; }
@@ -382,7 +383,8 @@ function padBoard(items) {
 // ---------- board ----------
 function renderBoard() {
   const items = state.boards[state.b];
-  state.frags = shuffle(items.flatMap((it, t) => it.d.p.map((p, part) => ({ t, part, text: clean(p) })))).map((f, id) => ({ ...f, id }));
+  const real = items.flatMap((it, t) => it.d.p.map((p, part) => ({ t, part, text: clean(p) })));
+  state.frags = shuffle([...real, ...spares(items, real)]).map((f, id) => ({ ...f, id }));
   state.placed = {}; state.sel = null; state.locked = false;
   $('progress').textContent = `${state.b + 1} of ${state.boards.length}`;
   const topics = [...new Set(items.map(it => it.d.topic))];
@@ -393,6 +395,22 @@ function renderBoard() {
     it.d.p.map((_, i) => `<button type="button" class="slot" data-slot="${t}-${i}" aria-label="${esc(it.d.term)}, piece ${i + 1}"></button>`).join('')
   }<p class="fix" hidden></p></div>`).join('');
   renderPieces();
+}
+// SPARES distractor pieces per board: one piece each from other terms, nearest topic first (same subtopic, then unit, then any)
+const SPARES = 2;
+function spares(items, real) {
+  const on = new Set(items.map(it => it.d)), texts = new Set(real.map(f => f.text));
+  const topics = new Set(items.map(it => it.d.topic)), units = new Set(items.map(it => it.d.unit));
+  const others = DEFS.filter(d => !on.has(d));
+  const tiers = [others.filter(d => topics.has(d.topic)), others.filter(d => !topics.has(d.topic) && units.has(d.unit)), others.filter(d => !units.has(d.unit))];
+  const out = [];
+  for (const d of tiers.flatMap(shuffle)) {
+    if (out.length === SPARES) break;
+    const text = clean(d.p[Math.floor(Math.random() * d.p.length)]);
+    if (texts.has(text)) continue;
+    texts.add(text); out.push({ t: -1, part: -1, text });
+  }
+  return out;
 }
 function fragHTML(f) {
   return `<button type="button" class="frag" data-f="${f.id}"><span class="grip" aria-hidden="true">&#8942;&#8942;</span><span class="txt">${esc(f.text)}</span><span class="mark"></span></button>`;
@@ -408,9 +426,10 @@ function renderPieces() {
   const loose = state.frags.filter(f => slotOf(f.id) === undefined);
   $('pool').innerHTML = loose.map(fragHTML).join('');
   if (typeof state.sel === 'number') document.querySelector(`.frag[data-f="${state.sel}"]`)?.classList.add('sel');
-  $('left').textContent = loose.length ? `${loose.length} left` : '';
+  const empty = document.querySelectorAll('#terms .slot:not(.filled)').length;
+  $('left').textContent = empty ? `${empty} ${empty === 1 ? 'box' : 'boxes'} left` : `${loose.length} spare`;
   $('score').textContent = `${state.score} right`;
-  $('check').disabled = loose.length > 0 || state.locked;
+  $('check').disabled = empty > 0 || state.locked;
 }
 // put piece fid into slot; whatever was there goes where fid came from
 function place(fid, slot) {

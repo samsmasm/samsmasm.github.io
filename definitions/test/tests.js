@@ -115,19 +115,32 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   await page.click('#start');                             // default 6
   ok(await text(page, '#progress') === '1 of 2', '6 terms = 2 boards');
   ok(await page.$$eval('#terms .term', l => l.length) === 3, '3 terms on a board');
-  ok(await page.$$eval('#pool .frag', l => l.length) === 6, '6 pieces in the pool');
-  ok(await page.$eval('#check', b => b.disabled), 'Check disabled until every piece is placed');
+  ok(await page.$$eval('#pool .frag', l => l.length) === 8, '8 pieces in the pool (6 + 2 spares)');
+  ok(await page.evaluate(() => {
+    const sp = state.frags.filter(f => f.t === -1), real = state.frags.filter(f => f.t >= 0);
+    const onBoard = new Set(state.boards[state.b].map(x => x.d));
+    return sp.length === 2 && sp.every(s => !real.some(r => r.text === s.text)) &&
+      sp.every(s => DEFS.some(d => !onBoard.has(d) && d.p.map(clean).includes(s.text)));
+  }), '2 spares, taken from terms not on the board');
+  ok(await page.$eval('#check', b => b.disabled), 'Check disabled until every box is filled');
   await shot(page, 'board-desktop');
 
   // board 1: taps (piece then box, and box then piece), all right
   let k = await key(page);
   await solveByTap(page, k);
   ok(await placedRight(page, k), 'tapping places pieces (either order)');
-  ok(await page.$eval('#check', b => !b.disabled), 'Check enabled when all placed');
+  ok(await page.$eval('#check', b => !b.disabled) && await page.$$eval('#pool .frag', l => l.length) === 2, 'Check enabled when all boxes are filled, 2 spares left');
+  ok(await text(page, '#left') === '2 spare', 'label says 2 spare');
+  // a spare in a box: Check stays enabled, the box is marked wrong
+  { const sp = await page.evaluate(() => state.frags.find(f => f.t === -1).id);
+    await page.click(`.frag[data-f="${sp}"]`); await page.click(`.slot[data-slot="${k[0].slot}"]`);
+    ok(await page.evaluate((k, sp) => state.placed[k[0].slot] === sp, k, sp) && await page.$eval('#check', b => !b.disabled), 'a spare can go in a box (swaps out the piece)');
+    await page.click(`.frag[data-f="${k[0].fid}"]`); await page.click(`.slot[data-slot="${k[0].slot}"]`);
+    ok(await placedRight(page, k), 'and swaps back'); }
   // tap a placed piece, then the pool: it goes back; then put it back
   await page.click(`.slot[data-slot="${k[0].slot}"] .frag`);
   await page.click('.poolwrap .label');
-  ok(await page.$$eval('#pool .frag', l => l.length) === 1, 'selected placed piece returns to the pool');
+  ok(await page.$$eval('#pool .frag', l => l.length) === 3, 'selected placed piece returns to the pool');
   await page.click(`.frag[data-f="${k[0].fid}"]`); await page.click(`.slot[data-slot="${k[0].slot}"]`);
   // swap two placed pieces by tapping one then the other
   await page.click(`.slot[data-slot="${k[0].slot}"] .frag`); await page.click(`.slot[data-slot="${k[2].slot}"] .frag`);
@@ -263,7 +276,7 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
     state.picks = new Set([one[0], two[0], two[1]]);
     startRound([one[0], two[0], two[1]].map(d => ({ d })));
   });
-  ok(await page.$$eval('#terms .slot', l => l.length) === 5 && await page.$$eval('#pool .frag', l => l.length) === 5, 'one-part term gets one box (5 pieces)');
+  ok(await page.$$eval('#terms .slot', l => l.length) === 5 && await page.$$eval('#pool .frag', l => l.length) === 7, 'one-part term gets one box (5 pieces + 2 spares)');
   k = await key(page);
   await solveByTap(page, k);
   await page.click('#check');
