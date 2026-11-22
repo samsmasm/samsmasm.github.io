@@ -484,12 +484,12 @@ function dtTable(key){const d=DT[key];const rows=[];d.options.forEach(o=>{if(!o.
   return '<p><b>Estimated net cash inflows over five years</b></p><table class="data"><tr><th>Option</th><th>Cost</th><th>Outcome</th><th>Probability</th><th>Net cash inflow</th></tr>'+rows.map(r=>'<tr>'+r.map(x=>`<td>${esc(x)}</td>`).join('')+'</tr>').join('')+'</table>'}
 function dtSVG(key,mode){ // mode: skeleton | solution
   const d=DT[key];const leaves=d.options.reduce((s,o)=>s+Math.max(1,o.out.length),0);
-  const W=820,rowH=72,H=leaves*rowH+40;const x0=40,xe=110,x1=380,xo=440,x2=660;let y=20,svg='';
+  const W=820,rowH=72,TH=leaves*rowH+40,H=TH+56;const x0=40,xe=110,x1=380,xo=440,x2=660;let y=20,svg='';
   const best=d.options.reduce((b,o)=>(ev(o)-o.cost)>(ev(b)-b.cost)?o:b,d.options[0]);
   const ln=(pts,c='#222',w=2)=>`<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="${c}" stroke-width="${w}"/>`;
   const tri=(x,yy)=>`<polygon points="${x},${yy} ${x+14},${yy-9} ${x+14},${yy+9}" fill="#fff" stroke="#222" stroke-width="2"/>`;
   const rows=[];d.options.forEach(o=>{const n=Math.max(1,o.out.length);const ys=[];for(let i=0;i<n;i++)ys.push(y+i*rowH+rowH/2);y+=n*rowH;rows.push({o,ys,cy:(ys[0]+ys[ys.length-1])/2})});
-  const dy=H/2;
+  const dy=TH/2;
   rows.forEach(({o,ys,cy})=>{
     const end=o.out.length?x1-14:x2;
     svg+=ln([[x0+14,dy],[xe,cy],[end,cy]]);
@@ -505,6 +505,15 @@ function dtSVG(key,mode){ // mode: skeleton | solution
       svg+=tri(x2,yy)+`<text x="${x2+22}" y="${yy+5}" font-size="13">${mode==='skeleton'?'$ ________':fmt(x[2])}</text>`});
   });
   svg+=`<rect x="${x0-14}" y="${dy-14}" width="28" height="28" fill="#fff" stroke="#222" stroke-width="2"/>`;
+  // key
+  const ky=TH+28;
+  svg+=`<line x1="${x0-14}" y1="${TH+4}" x2="${W-20}" y2="${TH+4}" stroke="#ccc" stroke-width="1"/>`;
+  svg+=`<text x="${x0-14}" y="${ky+5}" font-size="12" font-weight="bold">Key</text>`;
+  svg+=`<rect x="70" y="${ky-9}" width="18" height="18" fill="#fff" stroke="#222" stroke-width="2"/><text x="96" y="${ky+5}" font-size="12">Decision</text>`;
+  svg+=`<circle cx="190" cy="${ky}" r="9" fill="#fff" stroke="#222" stroke-width="2"/><text x="206" y="${ky+5}" font-size="12">Chance (outcomes)</text>`;
+  svg+=`<polygon points="340,${ky} 352,${ky-8} 352,${ky+8}" fill="#fff" stroke="#222" stroke-width="2"/><text x="362" y="${ky+5}" font-size="12">End (net cash inflow)</text>`;
+  svg+=ln([[520,ky-8],[526,ky+8]],'#c62828')+ln([[528,ky-8],[534,ky+8]],'#c62828')+`<text x="544" y="${ky+5}" font-size="12">Rejected option</text>`;
+  svg+=`<text x="660" y="${ky+5}" font-size="12">EV = expected value</text>`;
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial">${svg}</svg>`;
 }
 function dtSolutionText(key){const d=DT[key];const best=d.options.reduce((b,o)=>(ev(o)-o.cost)>(ev(b)-b.cost)?o:b,d.options[0]);
