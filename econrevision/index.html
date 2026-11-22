@@ -89,6 +89,11 @@ summary .count{font-weight:normal;color:var(--colour-muted);font-size:.85em;whit
 .rag:has(.on) button:not(.on){opacity:.35}
 .rag button.on{border-color:var(--colour-masthead);box-shadow:0 0 0 2px #fff inset}
 #graphsBody > details{scroll-margin-top:130px}
+.prio-card{border:2px solid var(--colour-accent)}
+.ph{display:flex;align-items:center;gap:8px;font-size:1.05em;margin:14px 0 6px}
+.ph::before{content:"";width:14px;height:14px;border-radius:3px}
+.ph.r::before{background:var(--colour-red)}.ph.a::before{background:var(--colour-amber)}
+#targetPrio ol{margin:0 0 8px}
 .hl{display:inline-block;color:var(--colour-hl);font-size:.75em;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;margin-right:6px}
 body.sl .hlonly{display:none!important}
 .ticks{display:flex;gap:var(--gap);flex-shrink:0;font-size:.85em}
@@ -310,6 +315,7 @@ li{margin-bottom:4px}
   <!-- TARGETS -->
   <section id="targets" class="hidden">
     <h1>5. Target setting</h1>
+    <div class="card prio-card"><h2 style="margin-top:0">Your priorities</h2><p class="muted" style="margin-top:0">From your course guide checklist: reds first, then ambers.</p><div id="targetPrio"></div></div>
     <p>Fill this in at the end of class 2.</p>
     <div class="tools">
       <button class="btn" data-copy="targets" data-kind="blank">Copy blank table</button>
@@ -491,7 +497,19 @@ $("#markband").innerHTML = "<tr><th>Marks</th><th>What it looks like</th></tr>" 
   else { a.removeAttribute("href"); a.classList.add("ghost"); a.style.opacity=".5"; a.textContent = "More help on answer structures (link coming soon)"; } })();
 
 /* ---- Targets ---- */
+function renderTargetPrio(){
+  const items = CL.filter(visible);
+  const red = items.filter(i => S.rag[i.id] === "r"), amb = items.filter(i => S.rag[i.id] === "a");
+  const grn = items.filter(i => S.rag[i.id] === "g").length, none = items.length - red.length - amb.length - grn;
+  const code = i => esc(i.sec.split(" ")[0] === "Unit" ? "Unit 1" : i.sec.split(" ")[0]);
+  const list = its => "<ol>" + its.map(i => `<li><span class="muted">${code(i)}</span> ${hlText(i.text)}</li>`).join("") + "</ol>";
+  $("#targetPrio").innerHTML = (red.length || amb.length)
+    ? (red.length ? `<h3 class="ph r">Red (${red.length})</h3>${list(red)}` : "") + (amb.length ? `<h3 class="ph a">Amber (${amb.length})</h3>${list(amb)}` : "") +
+      `<p class="muted">Green: ${grn}.${none ? ` Not rated yet: ${none}.` : ""}</p>`
+    : `<p class="muted">No reds or ambers yet. <a href="#checklist" onclick="go('checklist');return false">Rate the course guide checklist</a> first.</p>`;
+}
 function renderTargets(){
+  renderTargetPrio();
   $("#targetsBody").innerHTML = TARGETS.map(([id, label]) => `<h3>${label}</h3><textarea data-target="${id}">${esc(S.targets[id]||"")}</textarea>`).join("");
   $$("[data-target]").forEach(t => t.oninput = () => { S.targets[t.dataset.target] = t.value; save(); });
 }
@@ -553,6 +571,7 @@ function show(id){
   $$("#nav button").forEach(b => b.classList.toggle("on", b.dataset.go === id));
   try{ history.replaceState(null, "", "#" + id); }catch(e){}
   if(id === "home") renderPath();
+  if(id === "targets") renderTargetPrio();
   scrollTo(0, 0);
 }
 function renderPath(){
