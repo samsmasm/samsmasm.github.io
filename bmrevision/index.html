@@ -23,9 +23,9 @@
   --border:#e3e0d8;
   --accent:#1a3a7a;
   --accent-text:#ffffff;
-  --red:#a32626;
+  --red:#d32f2f;
   --amber:#f4a629;
-  --green:#18634f;
+  --green:#2e8b3e;
   --rag-red-bg:#f8e1e1;
   --rag-amber-bg:#fdf0d6;
   --rag-green-bg:#d9eee6;
@@ -101,10 +101,16 @@ details.sub>summary{padding:10px 14px 10px 28px;cursor:pointer}
 .item.r{background:var(--rag-red-bg)}.item.a{background:var(--rag-amber-bg)}.item.g{background:var(--rag-green-bg)}
 .group{padding:8px 14px 2px 40px;font-weight:bold;color:var(--muted)}
 .rag{display:flex;gap:4px;flex-shrink:0}
-.rag button{width:34px;height:30px;border:2px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-weight:bold;font-family:inherit}
-.rag button.r.on{background:var(--red);border-color:var(--red);color:#fff}
-.rag button.a.on{background:var(--amber);border-color:var(--amber);color:#000}
-.rag button.g.on{background:var(--green);border-color:var(--green);color:#fff}
+.rag button{width:36px;height:32px;border:2px solid transparent;border-radius:6px;cursor:pointer;font-weight:bold;font-family:inherit}
+.rag button.r{background:var(--red);color:#fff}
+.rag button.a{background:var(--amber);color:var(--masthead)}
+.rag button.g{background:var(--green);color:#fff}
+.rag:has(.on) button:not(.on){opacity:.35}
+.rag button.on{border-color:var(--masthead);box-shadow:0 0 0 2px #fff inset}
+.ph{display:flex;align-items:center;gap:8px;font-size:1.05rem;margin:14px 0 6px}
+.ph::before{content:"";width:14px;height:14px;border-radius:3px}
+.ph.r::before{background:var(--red)}.ph.a::before{background:var(--amber)}
+#prioList ol{margin:0 0 8px;padding-left:1.6em}#prioList li{margin-bottom:4px}
 /* checking */
 .chk{display:grid;grid-template-columns:1fr 180px 28px;gap:8px;align-items:center;margin:6px 0}
 .chk input{width:100%}
@@ -228,6 +234,7 @@ body:not(.sl) .sl-only{display:none}
   <p>Rate every line: <b>G</b> = I could use it in an exam answer now; <b>A</b> = I half know it; <b>R</b> = I do not know it, or cannot apply it. Be honest: red tells you where to spend your time.</p>
   <div class="btnrow"><button class="btn ghost small" onclick="toggleAll(true)">Expand everything</button><button class="btn ghost small" onclick="toggleAll(false)">Collapse everything</button></div>
   <div id="ragList"></div>
+  <div class="card"><h2 style="margin-top:0">Your priorities</h2><div id="prioList"></div></div>
   <div class="copyrow">
     <button class="btn small" onclick="copyRag('blank')">Copy blank checklist</button>
     <button class="btn small" onclick="copyRag('mine')">Copy my ratings</button>
@@ -444,7 +451,8 @@ const plainOf=(head,rows)=>[head||[],...rows].map(r=>r.join('\t')).join('\n');
 /* ===== LEVEL ===== */
 function setLevel(l){S.level=l;save();document.body.classList.toggle('sl',l==='SL');
   document.querySelectorAll('#levelToggle button').forEach(b=>b.classList.toggle('on',b.dataset.l===l));
-  if(l==='SL'&&/^cpa/.test(cur))go('home');}
+  if(l==='SL'&&/^cpa/.test(cur))go('home');
+  if($('prioList'))renderPrio();}
 document.querySelectorAll('#levelToggle button').forEach(b=>b.onclick=()=>setLevel(b.dataset.l));
 
 /* ===== ROUTING ===== */
@@ -484,12 +492,17 @@ function renderRag(){
     });
     h+='</details>';
   });
-  $('ragList').innerHTML=h;updateCounts();
+  $('ragList').innerHTML=h;updateCounts();renderPrio();
   const mm=$('mindmaps');
   mm.innerHTML=MINDMAP_LINKS.length?'<div class="card"><b>Mind maps:</b> '+MINDMAP_LINKS.map(l=>`<a href="${esc(l.url)}" target="_blank">${esc(l.label)}</a>`).join(' · ')+'</div>':'<p class="muted">Use your printed IB mind maps alongside this checklist.</p>';
 }
 function rate(id,k){S.rag[id]=S.rag[id]===k?'':k;save();const el=$('it-'+id);el.classList.remove('r','a','g');if(S.rag[id])el.classList.add(S.rag[id]);
-  el.querySelectorAll('.rag button').forEach(b=>b.classList.toggle('on',b.classList.contains(S.rag[id])&&!!S.rag[id]));updateCounts();}
+  el.querySelectorAll('.rag button').forEach(b=>b.classList.toggle('on',b.classList.contains(S.rag[id])&&!!S.rag[id]));updateCounts();renderPrio();}
+function renderPrio(){const rows=ragRows('mine');const red=rows.filter(r=>r[4]==='Red'),amb=rows.filter(r=>r[4]==='Amber'),grn=rows.filter(r=>r[4]==='Green').length;
+  const list=(rs)=>'<ol>'+rs.map(r=>`<li><span class="muted">${esc(r[1].split(' ')[0])}</span> ${esc(r[2])}</li>`).join('')+'</ol>';
+  $('prioList').innerHTML=(red.length||amb.length)?
+    (red.length?`<h3 class="ph r">Red (${red.length})</h3>${list(red)}`:'')+(amb.length?`<h3 class="ph a">Amber (${amb.length})</h3>${list(amb)}`:'')+`<p class="muted">Green: ${grn}. Turn your reds into topic cards first.</p>`
+    :'<p class="muted">Rate some lines above. Your reds and ambers will appear here, reds first.</p>';}
 function updateCounts(){SYL.forEach(u=>{const c={r:0,a:0,g:0};u.subs.forEach(sb=>sb.items.forEach((it,i)=>{const v=S.rag[itemId(sb.code,i)];if(v)c[v]++}));
   const e=$('cnt-'+u.u);if(e)e.textContent=`R ${c.r} · A ${c.a} · G ${c.g}`})}
 function toggleAll(open){document.querySelectorAll('#ragList details').forEach(d=>d.open=open)}
