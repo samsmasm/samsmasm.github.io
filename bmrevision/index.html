@@ -55,6 +55,18 @@ header.top .brand small{display:block;font-family:var(--font-body);font-size:.7r
 header.top a.home{color:var(--masthead-ink);font-size:.9rem;text-decoration:none}
 header.top a.home:hover{text-decoration:underline}
 header.top .btn.ghost{color:var(--masthead-ink);border-color:var(--masthead-sub)}
+header.top .wrap{row-gap:6px}
+nav.tabs{flex-basis:100%;display:flex;flex-wrap:wrap;gap:2px;align-items:center}
+nav.tabs button{background:transparent;color:var(--masthead-ink);border:0;border-bottom:3px solid transparent;padding:6px 10px;font:inherit;font-size:.95rem;cursor:pointer}
+nav.tabs button.on{border-bottom-color:var(--amber-rule)}
+nav.tabs button:hover{color:#fff;text-decoration:underline}
+.dd{position:relative}
+.ddmenu{display:none;position:absolute;top:100%;left:0;min-width:230px;background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--amber-rule);border-radius:0 0 var(--radius) var(--radius);padding:6px 0;z-index:30}
+.dd.open .ddmenu{display:block}
+nav.tabs .ddmenu button{display:block;width:100%;text-align:left;color:var(--text);border:0;border-left:3px solid transparent;padding:9px 14px}
+nav.tabs .ddmenu button:hover{background:var(--surface-2);text-decoration:none;color:var(--text)}
+nav.tabs .ddmenu button.on{border-left-color:var(--amber-rule);font-weight:700}
+@media (max-width:600px){header.top a.home{display:none}nav.tabs button{padding:6px 7px;font-size:.88rem}.ddmenu{position:fixed;left:16px;right:16px;top:auto;min-width:0}}
 .level{display:inline-flex;border:1px solid var(--masthead-sub);border-radius:var(--radius);overflow:hidden}
 .level button{border:0;background:transparent;padding:6px 14px;cursor:pointer;font:inherit;color:var(--masthead-ink)}
 .level button.on{background:var(--amber-rule);color:var(--masthead);font-weight:700}
@@ -110,7 +122,9 @@ details.sub>summary{padding:10px 14px 10px 28px;cursor:pointer}
 .ph{display:flex;align-items:center;gap:8px;font-size:1.05rem;margin:14px 0 6px}
 .ph::before{content:"";width:14px;height:14px;border-radius:3px}
 .ph.r::before{background:var(--red)}.ph.a::before{background:var(--amber)}
-#prioList ol{margin:0 0 8px;padding-left:1.6em}#prioList li{margin-bottom:4px}
+#prioList ol,#targetPrio ol{margin:0 0 8px;padding-left:1.6em}#prioList li,#targetPrio li{margin-bottom:4px}
+.prio-card{border:2px solid var(--accent)}
+@media (max-width:600px){table.data{display:block;overflow-x:auto}}
 /* checking */
 .chk{display:grid;grid-template-columns:1fr 180px 28px;gap:8px;align-items:center;margin:6px 0}
 .chk input{width:100%}
@@ -164,8 +178,31 @@ body:not(.sl) .sl-only{display:none}
 <header class="top"><div class="wrap">
   <span class="brand" onclick="go('home')"><img src="/geocorn.png" alt=""><span>BM revision<small>IB2 Business Management</small></span></span>
   <span class="level" id="levelToggle"><button data-l="SL">SL</button><button data-l="HL">HL</button></span>
-  <button class="btn ghost small" onclick="go('home')">Home</button>
   <a class="home" href="/">unisam.nz</a>
+  <nav class="tabs" id="tabs">
+    <button data-go="home">Home</button>
+    <button data-go="rag">1. RAG</button>
+    <button data-go="cards">2. Topic cards</button>
+    <div class="dd">
+      <button class="ddbtn" data-group="koto dt1 dt2 cpa1 cpa2 task3" aria-expanded="false">3. KOTO ▾</button>
+      <div class="ddmenu">
+        <button data-go="koto">KOTO case</button>
+        <button data-go="dt1">Decision tree 1</button>
+        <button data-go="dt2">Decision tree 2</button>
+        <button class="hlonly" data-go="cpa1">Critical path 1 (HL)</button>
+        <button class="hlonly" data-go="cpa2">Critical path 2 (HL)</button>
+        <button data-go="task3">Tools and recommendation</button>
+      </div>
+    </div>
+    <button data-go="wrap">4. Targets</button>
+    <div class="dd">
+      <button class="ddbtn" data-group="bank tools" aria-expanded="false">Helpers ▾</button>
+      <div class="ddmenu">
+        <button data-go="bank">Business bank</button>
+        <button data-go="tools">Toolkit grid</button>
+      </div>
+    </div>
+  </nav>
 </div></header>
 
 <div class="wrap">
@@ -213,7 +250,7 @@ body:not(.sl) .sl-only{display:none}
     </div>
     <div class="parrow"></div>
     <div class="prow">
-      <button class="pnode" onclick="go('wrap')"><span class="num">5</span><span class="pt"><b>Before 2 December</b><small>What has moved, and your goal.</small></span></button>
+      <button class="pnode" onclick="go('wrap')"><span class="num">5</span><span class="pt"><b>Targets</b><small>What has moved, and your goal for 2 December.</small></span></button>
     </div>
   </div>
   <div class="card">
@@ -375,7 +412,9 @@ body:not(.sl) .sl-only{display:none}
 
 <!-- WRAP -->
 <section class="view" id="v-wrap">
-  <h1>Before 2 December</h1>
+  <h1>Targets</h1>
+  <div class="card prio-card"><h2 style="margin-top:0">Your priorities</h2><p class="muted" style="margin-top:0">From your RAG: reds first, then ambers.</p><div id="targetPrio"></div></div>
+  <p>Fill this in before 2 December.</p>
   <div id="wrapForm"></div>
   <div class="copyrow">
     <button class="btn small" onclick="copyWrap('mine')">Copy my answers</button>
@@ -464,8 +503,18 @@ function go(v,skip){
   cur=v;document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));
   if(location.hash!=='#'+v)history.replaceState(null,'','#'+v);
   if(v==='home')renderPath();
+  markTabs();
   window.scrollTo(0,0);
 }
+function markTabs(){
+  document.querySelectorAll('#tabs [data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===cur));
+  document.querySelectorAll('#tabs .ddbtn').forEach(b=>b.classList.toggle('on',b.dataset.group.split(' ').includes(cur)));
+}
+function closeMenus(){document.querySelectorAll('#tabs .dd.open').forEach(d=>{d.classList.remove('open');d.querySelector('.ddbtn').setAttribute('aria-expanded','false')})}
+document.querySelectorAll('#tabs [data-go]').forEach(b=>b.onclick=()=>{closeMenus();go(b.dataset.go)});
+document.querySelectorAll('#tabs .ddbtn').forEach(b=>b.onclick=e=>{e.stopPropagation();const d=b.parentNode,was=d.classList.contains('open');closeMenus();if(!was){d.classList.add('open');b.setAttribute('aria-expanded','true')}});
+document.addEventListener('click',e=>{if(!e.target.closest('.dd'))closeMenus()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenus()});
 function renderPath(){
   const n=(S.cards||[]).filter(c=>Object.values(c).some(x=>x&&String(x).trim())).length;
   $('pRag').textContent=S.ragDone?'✓ Done':'';
@@ -500,9 +549,10 @@ function rate(id,k){S.rag[id]=S.rag[id]===k?'':k;save();const el=$('it-'+id);el.
   el.querySelectorAll('.rag button').forEach(b=>b.classList.toggle('on',b.classList.contains(S.rag[id])&&!!S.rag[id]));updateCounts();renderPrio();}
 function renderPrio(){const rows=ragRows('mine');const red=rows.filter(r=>r[4]==='Red'),amb=rows.filter(r=>r[4]==='Amber'),grn=rows.filter(r=>r[4]==='Green').length;
   const list=(rs)=>'<ol>'+rs.map(r=>`<li><span class="muted">${esc(r[1].split(' ')[0])}</span> ${esc(r[2])}</li>`).join('')+'</ol>';
-  $('prioList').innerHTML=(red.length||amb.length)?
-    (red.length?`<h3 class="ph r">Red (${red.length})</h3>${list(red)}`:'')+(amb.length?`<h3 class="ph a">Amber (${amb.length})</h3>${list(amb)}`:'')+`<p class="muted">Green: ${grn}. Turn your reds into topic cards first.</p>`
-    :'<p class="muted">Rate some lines above. Your reds and ambers will appear here, reds first.</p>';}
+  const body=(red.length?`<h3 class="ph r">Red (${red.length})</h3>${list(red)}`:'')+(amb.length?`<h3 class="ph a">Amber (${amb.length})</h3>${list(amb)}`:'');
+  const has=red.length||amb.length;
+  $('prioList').innerHTML=has?body+`<p class="muted">Green: ${grn}. Turn your reds into topic cards first.</p>`:'<p class="muted">Rate some lines above. Your reds and ambers will appear here, reds first.</p>';
+  $('targetPrio').innerHTML=has?body+`<p class="muted">Green: ${grn}.</p>`:`<p class="muted">No reds or ambers yet. <a href="#rag" onclick="go('rag');return false">Do your RAG</a> first.</p>`;}
 function updateCounts(){SYL.forEach(u=>{const c={r:0,a:0,g:0};u.subs.forEach(sb=>sb.items.forEach((it,i)=>{const v=S.rag[itemId(sb.code,i)];if(v)c[v]++}));
   const e=$('cnt-'+u.u);if(e)e.textContent=`R ${c.r} · A ${c.a} · G ${c.g}`})}
 function toggleAll(open){document.querySelectorAll('#ragList details').forEach(d=>d.open=open)}
@@ -511,7 +561,7 @@ function ragRows(mode){const rows=[];const hl=S.level!=='SL';
   SYL.forEach(u=>u.subs.forEach(sb=>{if(sb.hl&&!hl)return;sb.items.forEach((it,i)=>{if(it.g||(it.hl&&!hl))return;
     const v=S.rag[itemId(sb.code,i)]||'';if(mode==='reds'&&!(v==='r'||v==='a'))return;
     const bl=it.b?': '+it.b.filter(b=>hl||!b.hl).map(b=>b.t).join(', '):'';
-    rows.push([`Unit ${u.u}`,`${sb.code} ${sb.title}`,it.t+bl,it.ao,mode==='blank'?'':({r:'Red',a:'Amber',g:'Green'}[v]||'')])})}));return rows}
+    rows.push([`Unit ${u.u}`,`${sb.code} ${sb.title}`,(bl?it.t.replace(/[.:]\s*$/,''):it.t)+bl,it.ao,mode==='blank'?'':({r:'Red',a:'Amber',g:'Green'}[v]||'')])})}));return rows}
 function copyRag(mode){const head=['Unit','Subtopic','Content','AO','RAG'];const rows=ragRows(mode);
   copyHTML(tableHTML(head,rows),plainOf(head,rows),{blank:'Copied the blank checklist',mine:'Copied your ratings',reds:'Copied your reds and ambers'}[mode]+` (${rows.length} rows).`)}
 
